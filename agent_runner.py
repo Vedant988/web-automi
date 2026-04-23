@@ -33,14 +33,17 @@ class AgentStep:
 class StderrCapture(io.TextIOBase):
     """Captures stderr writes and parses them into structured agent steps."""
 
-    def __init__(self, event_queue: queue.Queue):
+    def __init__(self, event_queue: queue.Queue, original_stderr):
         super().__init__()
         self.queue = event_queue
+        self.original_stderr = original_stderr
         self.buffer = ""
         self.step_count = 0
         self._current_tool = None
 
     def write(self, text):
+        if self.original_stderr:
+            self.original_stderr.write(text)
         self.buffer += text
         while "\n" in self.buffer:
             line, self.buffer = self.buffer.split("\n", 1)
@@ -52,7 +55,8 @@ class StderrCapture(io.TextIOBase):
         return len(text)
 
     def flush(self):
-        pass
+        if self.original_stderr:
+            self.original_stderr.flush()
 
     def _emit(self, typ, status, title, detail, **kw):
         now = datetime.now(timezone.utc).isoformat()
@@ -194,9 +198,9 @@ class AgentRunner:
     def _run(self, prompt, model, final_model):
         from groq_chat import stream_chat_with_tools
 
-        capture = StderrCapture(self.event_queue)
-        stdout_capture = io.StringIO()
         original_stderr, original_stdout = sys.stderr, sys.stdout
+        capture = StderrCapture(self.event_queue, original_stderr)
+        stdout_capture = io.StringIO()
 
         try:
             sys.stderr = capture
