@@ -702,7 +702,7 @@ async def cleanup_browser(browser_or_none, context, page, is_remote):
     except Exception:
         pass
 
-async def search_web(query: str, timeout: int = 60) -> str:
+async def search_web(query: str, timeout: int = 90) -> str:
     """
     Use Playwright to run a generic web search worker.
     The worker tries multiple engines, detects blocked pages, extracts structured

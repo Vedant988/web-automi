@@ -244,7 +244,7 @@ def stream_chat_with_tools(
     final_temperature: float = 0.0,
     reasoning_effort: str = DEFAULT_REASONING_EFFORT,
     final_reasoning_effort: str = DEFAULT_REASONING_EFFORT,
-    max_tool_calls: int = 3,
+    max_tool_calls: int = 6,
     max_final_answer_retries: int = 2,
 ):
     """
