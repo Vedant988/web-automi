@@ -4,12 +4,14 @@ database.py
 SQLite-backed persistence for tasks and their execution steps.
 """
 
+import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
 from contextlib import contextmanager
 
-DB_PATH = "chats.db"
+# Use persistent mount on Render if available, otherwise local file
+DB_PATH = "/app/data/chats.db" if os.path.exists("/app/data") else "chats.db"
 
 
 def _get_connection():
