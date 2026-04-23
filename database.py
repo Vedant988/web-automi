@@ -10,8 +10,16 @@ import uuid
 from datetime import datetime, timezone
 from contextlib import contextmanager
 
-# Use persistent mount on Render if available, otherwise local file
-DB_PATH = "/app/data/chats.db" if os.path.exists("/app/data") else "chats.db"
+# Determine appropriate path based on environment permissions
+if os.path.exists("/app/data"):
+    # Render persistent disk
+    DB_PATH = "/app/data/chats.db"
+elif os.access(".", os.W_OK):
+    # Local development
+    DB_PATH = "chats.db"
+else:
+    # Serverless (Vercel/AWS Lambda) read-only filesystem fallback
+    DB_PATH = "/tmp/chats.db"
 
 
 def _get_connection():
