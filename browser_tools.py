@@ -644,14 +644,24 @@ async def get_browser_and_page(p, is_search=False):
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--disable-infobars",
+            "--disable-popup-blocking",
+            "--window-size=1920,1080",
+            "--disable-extensions",
         ]
         
-        extra_headers = None
-        if is_search:
-            extra_headers = {
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            }
+        # Apply highly natural browser headers universally to evade advanced bot walls
+        extra_headers = {
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1"
+        }
 
         try:
             if SELECTED_CHROME_PROFILE:
@@ -903,10 +913,6 @@ async def navigate_url(
             async with async_playwright() as p:
                 browser_or_none, context, page, is_remote = await get_browser_and_page(p, is_search=False)
                 try:
-                    # Mask navigator.webdriver at the JS level
-                    await page.add_init_script(
-                        "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-                    )
                     await _apply_stealth(page)
 
                     print(
