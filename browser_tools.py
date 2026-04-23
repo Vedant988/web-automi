@@ -569,7 +569,7 @@ async def visit_result_pages(context, results: list[dict], per_page_timeout_ms: 
             await _apply_stealth(page)
             await page.goto(url, timeout=per_page_timeout_ms, wait_until="domcontentloaded")
             title = (await page.title()).strip() or result["title"]
-            body_text = await page.locator("body").inner_text(timeout=3000)
+            body_text = await page.locator("body").inner_text(timeout=10000)
             excerpt = normalize_whitespace(body_text, limit=600)
 
             # ------------------------------------------------------------------
@@ -947,7 +947,7 @@ async def navigate_url(
                             file=sys.stderr, flush=True,
                         )
                         try:
-                            await page.locator(input_selector).fill(input_text, timeout=5000)
+                            await page.locator(input_selector).first.fill(input_text, timeout=5000)
                         except Exception:
                             # Try a broader approach — find the first visible textarea or input
                             await page.keyboard.type(input_text)
@@ -959,7 +959,7 @@ async def navigate_url(
                             file=sys.stderr, flush=True,
                         )
                         try:
-                            await page.locator(click_selector).click(timeout=5000)
+                            await page.locator(click_selector).first.click(timeout=5000)
                             await page.wait_for_timeout(3000)  # wait for response
                         except Exception as exc:
                             print(
@@ -981,7 +981,7 @@ async def navigate_url(
                     title = (await page.title()).strip()
                     body_text = ""
                     try:
-                        body_text = await page.locator("body").inner_text(timeout=5000)
+                        body_text = await page.locator("body").inner_text(timeout=10000)
                     except Exception:
                         pass
 
