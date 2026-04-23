@@ -636,61 +636,71 @@ async def get_browser_and_page(p, is_search=False):
     except Exception:
         print("[browser-use] No running Chrome found on port 9222. Launching persistent Chromium...", file=sys.stderr, flush=True)
         import os
-        
         global SELECTED_CHROME_PROFILE
-        if SELECTED_CHROME_PROFILE:
-            user_data_dir = SELECTED_CHROME_PROFILE["user_data_dir"]
-            channel = "chrome"
-            profile_arg = f"--profile-directory={SELECTED_CHROME_PROFILE['profile_directory']}"
-            args = [
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-infobars",
-                "--start-maximized",
-                profile_arg
-            ]
-        else:
-            user_data_dir = os.path.join(os.getcwd(), "browser_data")
-            channel = None
-            args = [
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-infobars",
-                "--start-maximized",
-            ]
-
-        kwargs = {
-            "user_data_dir": user_data_dir,
-            "headless": False,
-            "user_agent": SEARCH_USER_AGENT,
-            "locale": "en-US",
-            "viewport": {"width": 1440, "height": 960},
-            "args": args
-        }
-        if channel:
-            kwargs["channel"] = channel
-            
+        is_render = bool(os.environ.get("RENDER") or os.environ.get("HEADLESS"))
+        
+        args = [
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-infobars",
+        ]
+        
+        extra_headers = None
         if is_search:
-            kwargs["extra_http_headers"] = {
+            extra_headers = {
                 "Accept-Language": "en-US,en;q=0.9",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             }
+
         try:
-            context = await p.chromium.launch_persistent_context(**kwargs)
+            if SELECTED_CHROME_PROFILE:
+                user_data_dir = SELECTED_CHROME_PROFILE["user_data_dir"]
+                profile_arg = f"--profile-directory={SELECTED_CHROME_PROFILE['profile_directory']}"
+                args.extend(["--start-maximized", profile_arg])
+                
+                kwargs = {
+                    "user_data_dir": user_data_dir,
+                    "headless": is_render,
+                    "channel": "chrome",
+                    "user_agent": SEARCH_USER_AGENT,
+                    "locale": "en-US",
+                    "viewport": {"width": 1440, "height": 960},
+                    "args": args
+                }
+                if extra_headers:
+                    kwargs["extra_http_headers"] = extra_headers
+                    
+                context = await p.chromium.launch_persistent_context(**kwargs)
+                page = context.pages[0] if context.pages else await context.new_page()
+                return None, context, page, False
+            else:
+                # Default behavior: Ephemeral browser instance
+                # This prevents "profile currently IN USE" locking errors on concurrent runs or after crashes.
+                kwargs = {
+                    "headless": is_render,
+                    "args": args
+                }
+                browser = await p.chromium.launch(**kwargs)
+                context_kwargs = {
+                    "user_agent": SEARCH_USER_AGENT,
+                    "locale": "en-US",
+                    "viewport": {"width": 1440, "height": 960}
+                }
+                if extra_headers:
+                    context_kwargs["extra_http_headers"] = extra_headers
+                
+                context = await browser.new_context(**context_kwargs)
+                page = await context.new_page()
+                return browser, context, page, False
+                
         except Exception as e:
             if "exitCode=21" in str(e) or "TargetClosedError" in repr(e) or "in use" in str(e).lower() or "Target closed" in str(e):
                 raise RuntimeError(
                     "\n\n[FATAL ERROR] Chrome failed to launch because your selected profile is currently IN USE by another process.\n"
-                    "👉 SOLUTION 1: Close ALL Chrome windows. Also check your Windows System Tray (near the clock) and click 'Exit' on the Chrome icon to close background apps.\n"
-                    "👉 SOLUTION 2 (Recommended): Leave Chrome open, but start it from your terminal using this exact command BEFORE running this script:\n"
-                    "     & \"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --remote-debugging-port=9222\n"
-                    "   This allows the script to connect directly to your open browser without fighting for the profile lock!\n"
+                    "👉 SOLUTION: Close all background Chrome processes or start Chrome with --remote-debugging-port=9222.\n"
                 ) from None
             raise
-        page = context.pages[0] if context.pages else await context.new_page()
-        return None, context, page, False
 
 async def cleanup_browser(browser_or_none, context, page, is_remote):
     try:
@@ -833,7 +843,6 @@ async def search_web(query: str, timeout: int = 90) -> str:
                                 visited_pages=visited_pages,
                                 notes=notes,
                             )
-                            await cleanup_browser(browser_or_none, context, page, is_remote)
                             return result_text
 
                         notes.append(f"{engine['name']}: loaded page but extracted no structured results")
@@ -847,12 +856,10 @@ async def search_web(query: str, timeout: int = 90) -> str:
                         notes=notes or ["No search engine returned usable results."],
                     )
 
-                    await cleanup_browser(browser_or_none, context, page, is_remote)
                     return fallback_text
                     
-                except Exception as e:
+                finally:
                     await cleanup_browser(browser_or_none, context, page, is_remote)
-                    raise
         
         print(f"[browser-use] [START] Running async browser search (timeout={timeout}s)...", file=sys.stderr, flush=True)
         result = await asyncio.wait_for(search_with_browser(), timeout=timeout)
@@ -990,11 +997,9 @@ async def navigate_url(
                     else:
                         result = f"Page title: {title}\n\n{page_content}"
 
-                    await cleanup_browser(browser_or_none, context, page, is_remote)
                     return result
-                except Exception:
+                finally:
                     await cleanup_browser(browser_or_none, context, page, is_remote)
-                    raise
 
         result = await asyncio.wait_for(_run(), timeout=timeout + 10)
         print(
