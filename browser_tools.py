@@ -637,7 +637,7 @@ async def get_browser_and_page(p, is_search=False):
         print("[browser-use] No running Chrome found on port 9222. Launching persistent Chromium...", file=sys.stderr, flush=True)
         import os
         global SELECTED_CHROME_PROFILE
-        is_render = bool(os.environ.get("RENDER") or os.environ.get("HEADLESS"))
+        is_headless = bool(os.environ.get("HEADLESS"))
         
         args = [
             "--disable-blink-features=AutomationControlled",
@@ -661,7 +661,7 @@ async def get_browser_and_page(p, is_search=False):
                 
                 kwargs = {
                     "user_data_dir": user_data_dir,
-                    "headless": is_render,
+                    "headless": is_headless,
                     "channel": "chrome",
                     "user_agent": SEARCH_USER_AGENT,
                     "locale": "en-US",
@@ -678,7 +678,7 @@ async def get_browser_and_page(p, is_search=False):
                 # Default behavior: Ephemeral browser instance
                 # This prevents "profile currently IN USE" locking errors on concurrent runs or after crashes.
                 kwargs = {
-                    "headless": is_render,
+                    "headless": is_headless,
                     "args": args
                 }
                 browser = await p.chromium.launch(**kwargs)

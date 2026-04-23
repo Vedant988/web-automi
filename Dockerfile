@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install system utilities needed for Playwright
 RUN apt-get update && \
-    apt-get install -y curl wget && \
+    apt-get install -y curl wget xvfb && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
@@ -21,5 +21,5 @@ COPY . .
 # Expose the port
 EXPOSE 8000
 
-# Start the application
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start the application with a virtual framebuffer (Xvfb) to bypass headless bot detection
+CMD ["xvfb-run", "-a", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
