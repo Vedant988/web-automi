@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>AI Automation Dashboard</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
@@ -39,30 +39,39 @@ tailwind.config = {
 };
 </script>
 </head>
-<body class="bg-[#f8f9fa] text-[#191c1d] min-h-screen flex font-sans antialiased">
+<body class="bg-[#f8f9fa] text-[#191c1d] min-h-screen flex font-sans antialiased overflow-x-hidden">
+
+<!-- Mobile Backdrop -->
+<div id="sidebar-backdrop" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden transition-opacity opacity-0 pointer-events-none"></div>
 
 <!-- ═══ SIDEBAR ═══ -->
-<nav id="sidebar" class="sidebar-nav bg-white h-screen fixed left-0 top-0 w-64 border-r border-slate-200 shadow-[0_4px_20px_rgba(45,90,110,0.05)] flex flex-col py-6 z-50 transition-all duration-300">
-  <div class="px-6 mb-8 flex items-center gap-3">
-    <div class="w-10 h-10 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-xl shrink-0">AI</div>
-    <div class="sidebar-text">
-      <h1 class="text-lg font-bold text-primary leading-tight">Web-Automi</h1>
-      <span class="text-xs text-slate-500 font-medium">Automation Hub</span>
+<nav id="sidebar" class="sidebar-nav bg-white h-screen fixed left-0 top-0 w-64 border-r border-slate-200 shadow-[0_4px_20px_rgba(45,90,110,0.05)] flex flex-col py-6 z-50 transition-transform duration-300 -translate-x-full md:translate-x-0">
+  <div class="px-6 mb-8 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-xl shrink-0">AI</div>
+      <div class="sidebar-text">
+        <h1 class="text-lg font-bold text-primary leading-tight">Web-Automi</h1>
+        <span class="text-xs text-slate-500 font-medium">Automation Hub</span>
+      </div>
     </div>
+    <!-- Mobile close button -->
+    <button id="btn-sidebar-close" class="md:hidden text-slate-400 hover:text-slate-600">
+      <span class="material-symbols-outlined text-[20px]">close</span>
+    </button>
   </div>
 
-  <button id="btn-sidebar-toggle" class="absolute -right-3 top-20 w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center hover:bg-slate-50 z-50 transition-transform" title="Toggle sidebar">
+  <button id="btn-sidebar-toggle" class="hidden md:flex absolute -right-3 top-20 w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm items-center justify-center hover:bg-slate-50 z-50 transition-transform" title="Toggle sidebar">
     <span class="material-symbols-outlined text-[14px] text-slate-500" id="sidebar-arrow">chevron_left</span>
   </button>
 
-  <ul class="flex-1 px-4 space-y-1">
+  <ul class="flex-1 px-4 space-y-1 overflow-y-auto custom-scroll">
     <li><a class="nav-link" href="#" data-view="dashboard"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="sidebar-text font-medium text-sm">Dashboard</span></a></li>
     <li><a class="nav-link active" href="#" data-view="agent"><span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1;">precision_manufacturing</span><span class="sidebar-text text-sm">Agent Activity</span></a></li>
     <li><a class="nav-link" href="#" data-view="history"><span class="material-symbols-outlined text-[20px]">assignment</span><span class="sidebar-text font-medium text-sm">Task History</span></a></li>
     <li><a class="nav-link" href="#" data-view="settings"><span class="material-symbols-outlined text-[20px]">settings</span><span class="sidebar-text font-medium text-sm">Settings</span></a></li>
   </ul>
 
-  <div class="px-6 sidebar-text">
+  <div class="px-6 sidebar-text mt-4">
     <div class="text-xs text-slate-400 font-medium">Model</div>
     <select id="setting-model" class="mt-1 w-full text-xs bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-slate-600 focus:ring-1 focus:ring-primary">
       <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
@@ -74,50 +83,75 @@ tailwind.config = {
 </nav>
 
 <!-- ═══ MAIN WRAPPER ═══ -->
-<div id="main-wrapper" class="flex-1 ml-64 flex flex-col min-h-screen transition-all duration-300">
+<div id="main-wrapper" class="flex-1 ml-0 md:ml-64 flex flex-col min-h-screen transition-all duration-300 w-full relative">
 
   <!-- Top Bar -->
-  <header class="bg-white/80 backdrop-blur-md fixed top-0 right-0 left-64 h-16 border-b border-slate-200 z-40 flex items-center justify-between px-8 transition-all duration-300" id="topbar">
-    <div class="flex items-center gap-4">
-      <span class="text-lg font-black text-slate-800">Automation Studio</span>
-    </div>
-    <div class="flex-1 max-w-xl mx-8">
-      <div class="relative">
-        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
-        <input id="task-input" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all placeholder:text-slate-400" placeholder="Describe your task — e.g. &quot;Find latest IPL scores&quot;" type="text" autocomplete="off"/>
+  <header class="bg-white/90 backdrop-blur-md fixed top-0 right-0 left-0 md:left-64 h-auto md:h-16 border-b border-slate-200 z-30 flex flex-col md:flex-row md:items-center justify-between px-4 md:px-8 py-3 md:py-0 transition-all duration-300 shadow-sm md:shadow-none" id="topbar">
+    
+    <!-- Mobile top row -->
+    <div class="flex items-center justify-between w-full md:w-auto mb-3 md:mb-0">
+      <div class="flex items-center gap-3">
+        <button id="btn-sidebar-open" class="md:hidden text-slate-500 hover:text-slate-800 focus:outline-none">
+          <span class="material-symbols-outlined text-[24px]">menu</span>
+        </button>
+        <span class="text-base md:text-lg font-black text-slate-800">Automation Studio</span>
+      </div>
+      
+      <!-- Mobile status and run button (moved to top row on mobile) -->
+      <div class="flex md:hidden items-center gap-2">
+        <span id="status-chip-mobile" class="status-chip-ui px-2 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-semibold flex items-center gap-1 border border-slate-200">
+          <span class="status-dot-ui w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+          <span class="status-label-ui">Idle</span>
+        </span>
+        <button id="btn-run-mobile" class="btn-run-ui bg-primary text-white p-1.5 rounded-lg transition-colors flex items-center justify-center">
+          <span class="material-symbols-outlined text-[18px]">play_arrow</span>
+        </button>
+        <button id="btn-stop-mobile" class="btn-stop-ui hidden bg-red-500 text-white p-1.5 rounded-lg transition-colors flex items-center justify-center">
+          <span class="material-symbols-outlined text-[18px]">stop</span>
+        </button>
       </div>
     </div>
-    <div class="flex items-center gap-3">
-      <span id="status-chip" class="px-3 py-1 bg-slate-50 text-slate-500 rounded-full text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition-all">
-        <span id="status-dot" class="w-1.5 h-1.5 rounded-full bg-slate-400 transition-colors"></span>
-        <span id="status-label">Idle</span>
+
+    <!-- Search Input -->
+    <div class="flex-1 w-full md:max-w-xl md:mx-8">
+      <div class="relative">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+        <input id="task-input" class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all placeholder:text-slate-400" placeholder="Describe your task — e.g. &quot;Find IPL scores&quot;" type="text" autocomplete="off"/>
+      </div>
+    </div>
+
+    <!-- Desktop status and run button -->
+    <div class="hidden md:flex items-center gap-3">
+      <span id="status-chip-desktop" class="status-chip-ui px-3 py-1 bg-slate-50 text-slate-500 rounded-full text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition-all">
+        <span class="status-dot-ui w-1.5 h-1.5 rounded-full bg-slate-400 transition-colors"></span>
+        <span class="status-label-ui">Idle</span>
       </span>
       <span id="step-badge" class="hidden px-2 py-1 bg-slate-50 text-slate-600 rounded-md text-xs font-mono font-semibold border border-slate-200">Step <span id="step-num">0</span></span>
-      <button id="btn-run" class="bg-primary hover:bg-primary/90 text-white px-5 py-2 rounded-lg font-semibold text-sm transition-colors flex items-center gap-2 shadow-sm">
+      <button id="btn-run-desktop" class="btn-run-ui bg-primary hover:bg-primary/90 text-white px-5 py-2 rounded-lg font-semibold text-sm transition-colors flex items-center gap-2 shadow-sm">
         <span class="material-symbols-outlined text-[18px]">play_arrow</span> Run
       </button>
-      <button id="btn-stop" class="hidden bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors flex items-center gap-2">
+      <button id="btn-stop-desktop" class="btn-stop-ui hidden bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors flex items-center gap-2">
         <span class="material-symbols-outlined text-[18px]">stop</span> Stop
       </button>
     </div>
   </header>
 
   <!-- Error Banner -->
-  <div id="error-banner" class="hidden fixed top-16 right-0 left-64 z-30 bg-red-50 border-b border-red-200 px-8 py-2 flex items-center gap-3 text-sm text-red-700 font-medium transition-all duration-300">
-    <span class="material-symbols-outlined text-[18px]">error</span>
-    <span id="error-text"></span>
-    <button id="btn-dismiss-error" class="ml-auto text-red-500 hover:text-red-700 text-xs font-semibold">Dismiss</button>
+  <div id="error-banner" class="hidden fixed top-[100px] md:top-16 right-0 left-0 md:left-64 z-20 bg-red-50 border-b border-red-200 px-4 md:px-8 py-2 flex items-center gap-3 text-xs md:text-sm text-red-700 font-medium transition-all duration-300">
+    <span class="material-symbols-outlined text-[16px] md:text-[18px]">error</span>
+    <span id="error-text" class="flex-1 truncate"></span>
+    <button id="btn-dismiss-error" class="ml-auto text-red-500 hover:text-red-700 text-xs font-semibold shrink-0">Dismiss</button>
   </div>
 
   <!-- ═══ MAIN CONTENT ═══ -->
-  <main class="flex-1 pt-24 pb-16 px-8 max-w-[1600px] mx-auto w-full">
+  <main class="flex-1 pt-[120px] md:pt-24 pb-20 md:pb-16 px-4 md:px-8 max-w-[1600px] mx-auto w-full">
 
     <!-- Welcome state -->
-    <div id="welcome-pane" class="flex flex-col items-center justify-center py-20">
-      <div class="w-16 h-16 rounded-2xl bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-3xl mb-6 animate-float">AI</div>
-      <h2 class="text-3xl font-bold text-slate-800 mb-2">Web-Automi</h2>
-      <p class="text-slate-500 text-sm mb-8 max-w-md text-center">Autonomous AI web agent — searches, navigates, and extracts real-time information for you.</p>
-      <div class="flex flex-wrap gap-2 justify-center">
+    <div id="welcome-pane" class="flex flex-col items-center justify-center py-10 md:py-20 px-4">
+      <div class="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-2xl md:text-3xl mb-4 md:mb-6 animate-float">AI</div>
+      <h2 class="text-2xl md:text-3xl font-bold text-slate-800 mb-2">Web-Automi</h2>
+      <p class="text-slate-500 text-xs md:text-sm mb-6 md:mb-8 max-w-md text-center">Autonomous AI web agent — searches, navigates, and extracts real-time information for you.</p>
+      <div class="flex flex-wrap gap-2 justify-center max-w-lg">
         <button class="example-chip" data-prompt="What's the current weather in New York?">🌤 Weather in NYC</button>
         <button class="example-chip" data-prompt="Find the latest IPL cricket scores">🏏 IPL scores</button>
         <button class="example-chip" data-prompt="What are the top trending topics on Twitter today?">📈 Twitter trends</button>
@@ -127,53 +161,53 @@ tailwind.config = {
 
     <!-- Agent view -->
     <div id="agent-view" class="hidden">
-      <div class="mb-6">
-        <h2 class="text-2xl font-bold text-slate-800">Agent Details</h2>
-        <p class="text-sm text-slate-500 mt-1">Reviewing execution steps and real-time output.</p>
+      <div class="mb-4 md:mb-6">
+        <h2 class="text-xl md:text-2xl font-bold text-slate-800">Agent Details</h2>
+        <p class="text-xs md:text-sm text-slate-500 mt-1">Reviewing execution steps and real-time output.</p>
       </div>
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
         <!-- Left: Agent Activity -->
-        <div class="lg:col-span-4 bg-white rounded-xl shadow-[0_4px_20px_rgba(45,90,110,0.05)] border border-slate-100 p-5 flex flex-col activity-panel">
-          <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-            <h3 class="text-base font-semibold text-slate-800">Agent Activity</h3>
-            <span id="step-count-badge" class="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-md text-xs font-mono font-semibold border border-slate-200">0 Steps</span>
+        <div class="lg:col-span-4 bg-white rounded-xl shadow-[0_4px_20px_rgba(45,90,110,0.05)] border border-slate-100 p-4 md:p-5 flex flex-col activity-panel">
+          <div class="flex items-center justify-between mb-3 md:mb-4 pb-3 border-b border-slate-100">
+            <h3 class="text-sm md:text-base font-semibold text-slate-800">Agent Activity</h3>
+            <span id="step-count-badge" class="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-md text-[10px] md:text-xs font-mono font-semibold border border-slate-200">0 Steps</span>
           </div>
-          <div id="step-list" class="flex-1 overflow-y-auto pr-1 space-y-5 custom-scroll">
-            <p class="text-sm text-slate-400 text-center py-8">No activity yet. Run a task to begin.</p>
+          <div id="step-list" class="flex-1 overflow-y-auto pr-1 space-y-4 md:space-y-5 custom-scroll">
+            <p class="text-xs md:text-sm text-slate-400 text-center py-8">No activity yet. Run a task to begin.</p>
           </div>
         </div>
 
         <!-- Right: Log + Result -->
-        <div class="lg:col-span-8 flex flex-col gap-5">
+        <div class="lg:col-span-8 flex flex-col gap-4 md:gap-5">
           <!-- Browser / Terminal Log -->
           <div class="flex-1 bg-white rounded-xl shadow-[0_4px_20px_rgba(45,90,110,0.05)] border border-slate-100 flex flex-col overflow-hidden log-panel">
-            <div class="bg-slate-50 border-b border-slate-100 px-4 py-2.5 flex items-center gap-2">
+            <div class="bg-slate-50 border-b border-slate-100 px-3 md:px-4 py-2 md:py-2.5 flex items-center gap-2">
               <div class="flex gap-1.5">
-                <div class="w-3 h-3 rounded-full bg-slate-300"></div>
-                <div class="w-3 h-3 rounded-full bg-slate-300"></div>
-                <div class="w-3 h-3 rounded-full bg-slate-300"></div>
+                <div class="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-slate-300"></div>
+                <div class="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-slate-300"></div>
+                <div class="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-slate-300"></div>
               </div>
-              <div class="ml-4 flex-1 bg-white border border-slate-200 rounded-md py-1 px-3 text-xs text-slate-500 font-mono text-center shadow-sm" id="log-title">automation-viewer // execution-log</div>
+              <div class="ml-2 md:ml-4 flex-1 bg-white border border-slate-200 rounded-md py-1 px-2 md:px-3 text-[10px] md:text-xs text-slate-500 font-mono text-center shadow-sm truncate" id="log-title">automation-viewer // execution-log</div>
             </div>
-            <div id="log-body" class="p-4 bg-slate-50/50 flex-1 overflow-y-auto font-mono text-[13px] text-slate-600 space-y-1.5 custom-scroll min-h-[200px]">
+            <div id="log-body" class="p-3 md:p-4 bg-slate-50/50 flex-1 overflow-y-auto font-mono text-[11px] md:text-[13px] text-slate-600 space-y-1 md:space-y-1.5 custom-scroll min-h-[150px] md:min-h-[200px]">
               <p class="text-slate-400 text-center py-6">Waiting for agent to start…</p>
             </div>
           </div>
 
           <!-- Final Answer -->
-          <div id="result-card" class="hidden bg-primary-container rounded-xl shadow-[0_4px_20px_rgba(45,90,110,0.15)] p-5 relative overflow-hidden border border-[#376478]">
-            <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-              <span class="material-symbols-outlined text-8xl text-white">check_circle</span>
+          <div id="result-card" class="hidden bg-primary-container rounded-xl shadow-[0_4px_20px_rgba(45,90,110,0.15)] p-4 md:p-5 relative overflow-hidden border border-[#376478]">
+            <div class="absolute top-0 right-0 p-3 md:p-4 opacity-10 pointer-events-none">
+              <span class="material-symbols-outlined text-6xl md:text-8xl text-white">check_circle</span>
             </div>
             <div class="relative z-10">
-              <div class="flex items-center gap-2 mb-3">
-                <span class="material-symbols-outlined text-on-primary-container text-[20px]">assignment_turned_in</span>
-                <h3 class="text-lg font-semibold text-white">Final Answer</h3>
+              <div class="flex items-center gap-2 mb-2 md:mb-3">
+                <span class="material-symbols-outlined text-on-primary-container text-[18px] md:text-[20px]">assignment_turned_in</span>
+                <h3 class="text-base md:text-lg font-semibold text-white">Final Answer</h3>
               </div>
-              <div id="result-body" class="bg-white/10 rounded-lg p-5 border border-white/10 backdrop-blur-sm text-white leading-relaxed result-content"></div>
-              <div class="mt-4 flex justify-end">
-                <button id="btn-copy" class="px-4 py-2 bg-white text-primary rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-1.5">
-                  <span class="material-symbols-outlined text-[16px]">content_copy</span> Copy Results
+              <div id="result-body" class="bg-white/10 rounded-lg p-3 md:p-5 border border-white/10 backdrop-blur-sm text-white text-sm md:text-base leading-relaxed result-content overflow-x-auto"></div>
+              <div class="mt-3 md:mt-4 flex justify-end">
+                <button id="btn-copy" class="px-3 md:px-4 py-1.5 md:py-2 bg-white text-primary rounded-lg text-xs md:text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-1 md:gap-1.5">
+                  <span class="material-symbols-outlined text-[14px] md:text-[16px]">content_copy</span> Copy Results
                 </button>
               </div>
             </div>
@@ -184,21 +218,21 @@ tailwind.config = {
 
     <!-- History view -->
     <div id="history-view" class="hidden">
-      <div class="mb-6">
-        <h2 class="text-2xl font-bold text-slate-800">Task History</h2>
-        <p class="text-sm text-slate-500 mt-1">Past tasks and their results.</p>
+      <div class="mb-4 md:mb-6">
+        <h2 class="text-xl md:text-2xl font-bold text-slate-800">Task History</h2>
+        <p class="text-xs md:text-sm text-slate-500 mt-1">Past tasks and their results.</p>
       </div>
-      <div id="history-list" class="space-y-3">
-        <p class="text-sm text-slate-400 text-center py-12">No tasks yet.</p>
+      <div id="history-list" class="space-y-2 md:space-y-3">
+        <p class="text-xs md:text-sm text-slate-400 text-center py-12">No tasks yet.</p>
       </div>
     </div>
 
   </main>
 
   <!-- Footer -->
-  <footer class="bg-slate-50 text-slate-500 text-xs font-medium fixed bottom-0 right-0 left-64 h-10 border-t border-slate-200 flex items-center justify-between px-8 z-40 transition-all duration-300" id="footer">
+  <footer class="bg-slate-50 text-slate-500 text-[10px] md:text-xs font-medium fixed bottom-0 right-0 left-0 md:left-64 h-10 border-t border-slate-200 flex items-center justify-between px-4 md:px-8 z-30 transition-all duration-300" id="footer">
     <span>© 2026 Web-Automi</span>
-    <div class="flex gap-6">
+    <div class="flex gap-4 md:gap-6">
       <span id="footer-status" class="text-slate-400">System Status: Online</span>
     </div>
   </footer>

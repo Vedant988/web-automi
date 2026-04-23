@@ -5,12 +5,23 @@
 // ── DOM refs ──────────────────────────────────────────
 const sidebar       = document.getElementById("sidebar");
 const sidebarArrow  = document.getElementById("sidebar-arrow");
+const btnSidebarOpen= document.getElementById("btn-sidebar-open");
+const btnSidebarClose= document.getElementById("btn-sidebar-close");
+const sidebarBackdrop= document.getElementById("sidebar-backdrop");
+
 const mainWrapper   = document.getElementById("main-wrapper");
 const taskInput     = document.getElementById("task-input");
-const btnRun        = document.getElementById("btn-run");
-const btnStop       = document.getElementById("btn-stop");
-const statusChip    = document.getElementById("status-chip");
-const statusLabel   = document.getElementById("status-label");
+
+// Desktop controls
+const btnRunDesktop = document.getElementById("btn-run-desktop");
+const btnStopDesktop = document.getElementById("btn-stop-desktop");
+const statusChipDesktop = document.getElementById("status-chip-desktop");
+
+// Mobile controls
+const btnRunMobile  = document.getElementById("btn-run-mobile");
+const btnStopMobile = document.getElementById("btn-stop-mobile");
+const statusChipMobile = document.getElementById("status-chip-mobile");
+
 const stepBadge     = document.getElementById("step-badge");
 const stepNum       = document.getElementById("step-num");
 const errorBanner   = document.getElementById("error-banner");
@@ -33,10 +44,31 @@ let stepCount = 0;
 // ══════════════════════════════════════════════════════
 // SIDEBAR
 // ══════════════════════════════════════════════════════
+// Desktop Sidebar Toggle
 document.getElementById("btn-sidebar-toggle").addEventListener("click", () => {
   sidebar.classList.toggle("collapsed");
   sidebarArrow.textContent = sidebar.classList.contains("collapsed") ? "chevron_right" : "chevron_left";
 });
+
+// Mobile Sidebar Toggle
+function closeMobileSidebar() {
+  sidebar.classList.add("-translate-x-full");
+  sidebarBackdrop.classList.add("hidden", "opacity-0");
+  sidebarBackdrop.classList.remove("pointer-events-auto");
+}
+function openMobileSidebar() {
+  sidebar.classList.remove("-translate-x-full");
+  sidebarBackdrop.classList.remove("hidden");
+  // tiny delay to allow display:block to apply before animating opacity
+  setTimeout(() => {
+    sidebarBackdrop.classList.remove("opacity-0");
+    sidebarBackdrop.classList.add("pointer-events-auto");
+  }, 10);
+}
+
+btnSidebarOpen.addEventListener("click", openMobileSidebar);
+btnSidebarClose.addEventListener("click", closeMobileSidebar);
+sidebarBackdrop.addEventListener("click", closeMobileSidebar);
 
 // Nav links
 document.querySelectorAll(".nav-link").forEach(link => {
@@ -49,6 +81,10 @@ document.querySelectorAll(".nav-link").forEach(link => {
     else if (view === "agent") showView("agent");
     else if (view === "dashboard") showView("welcome");
     else if (view === "settings") showView("welcome");
+
+    if (window.innerWidth < 768) {
+      closeMobileSidebar();
+    }
   });
 });
 
@@ -64,7 +100,8 @@ function showView(name) {
 function setStatus(state, label) {
   document.body.className = document.body.className.replace(/status-\w+/g, "");
   if (state) document.body.classList.add("status-" + state);
-  statusLabel.textContent = label || state || "Idle";
+  
+  document.querySelectorAll(".status-label-ui").forEach(el => el.textContent = label || state || "Idle");
 }
 
 function showError(msg) {
@@ -221,8 +258,9 @@ function runTask(prompt) {
   document.querySelector('[data-view="agent"]').classList.add("active");
 
   setStatus("running", "Running");
-  btnRun.classList.add("hidden");
-  btnStop.classList.remove("hidden");
+  
+  document.querySelectorAll(".btn-run-ui").forEach(b => b.classList.add("hidden"));
+  document.querySelectorAll(".btn-stop-ui").forEach(b => b.classList.remove("hidden"));
   taskInput.disabled = true;
 
   const model = settingModel.value;
@@ -283,8 +321,8 @@ function runTask(prompt) {
 
 function finishRun() {
   isRunning = false;
-  btnRun.classList.remove("hidden");
-  btnStop.classList.add("hidden");
+  document.querySelectorAll(".btn-run-ui").forEach(b => b.classList.remove("hidden"));
+  document.querySelectorAll(".btn-stop-ui").forEach(b => b.classList.add("hidden"));
   taskInput.disabled = false;
   taskInput.focus();
   ws = null;
@@ -389,8 +427,10 @@ function timeAgo(iso) {
 // ══════════════════════════════════════════════════════
 // EVENT LISTENERS
 // ══════════════════════════════════════════════════════
-btnRun.addEventListener("click", () => runTask(taskInput.value));
-btnStop.addEventListener("click", stopTask);
+btnRunDesktop.addEventListener("click", () => runTask(taskInput.value));
+btnStopDesktop.addEventListener("click", stopTask);
+btnRunMobile.addEventListener("click", () => runTask(taskInput.value));
+btnStopMobile.addEventListener("click", stopTask);
 taskInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runTask(taskInput.value); } });
 document.querySelectorAll(".example-chip").forEach(c => c.addEventListener("click", () => { taskInput.value = c.dataset.prompt; runTask(c.dataset.prompt); }));
 
