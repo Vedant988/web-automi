@@ -1,0 +1,121 @@
+/* Web-Automi — Custom styles (Tailwind handles 90%) */
+
+/* ── Sidebar collapse ─────────────────────────── */
+.sidebar-nav.collapsed { width: 4rem; }
+.sidebar-nav.collapsed .sidebar-text { display: none; }
+.sidebar-nav.collapsed .nav-link { justify-content: center; padding-left: 0; padding-right: 0; }
+.sidebar-nav.collapsed + #main-wrapper,
+.sidebar-nav.collapsed ~ #main-wrapper { margin-left: 4rem; }
+.sidebar-nav.collapsed ~ #main-wrapper #topbar,
+.sidebar-nav.collapsed ~ #main-wrapper #footer { left: 4rem; }
+
+/* ── Nav links ────────────────────────────────── */
+.nav-link {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.65rem 1rem; border-radius: 0.5rem;
+  color: #64748b; font-weight: 500; font-size: 0.875rem;
+  transition: all 0.2s; border-left: 3px solid transparent;
+}
+.nav-link:hover { color: #0f172a; background: #f1f5f9; }
+.nav-link.active {
+  border-left-color: #104356; background: #f8fafb;
+  color: #104356; font-weight: 600;
+}
+
+/* ── Example chips ────────────────────────────── */
+.example-chip {
+  padding: 0.5rem 1rem; border-radius: 1.25rem;
+  background: white; border: 1px solid #e2e8f0;
+  color: #64748b; font-size: 0.8rem; cursor: pointer;
+  transition: all 0.2s; font-family: inherit;
+}
+.example-chip:hover {
+  border-color: #104356; color: #0f172a;
+  box-shadow: 0 0 12px rgba(16,67,86,0.1);
+}
+
+/* ── Timeline dot + connector ─────────────────── */
+.step-dot {
+  width: 0.5rem; height: 0.5rem; border-radius: 50%;
+  background: #2d5a6e; box-shadow: 0 0 0 4px rgba(45,90,110,0.1);
+  position: absolute; left: 0; top: 0.3rem; z-index: 2;
+}
+.step-dot.running {
+  background: #eab308; box-shadow: 0 0 0 4px rgba(234,179,8,0.15);
+  animation: pulse-dot 1.5s infinite;
+}
+.step-dot.success { background: #22c55e; box-shadow: 0 0 0 4px rgba(34,197,94,0.15); }
+.step-dot.failed  { background: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,0.15); }
+
+.step-connector {
+  position: absolute; left: 3px; top: 1rem;
+  width: 2px; height: calc(100% + 0.5rem);
+  background: #e2e8f0;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(234,179,8,0.15); }
+  50% { box-shadow: 0 0 0 8px rgba(234,179,8,0.08); }
+}
+
+/* ── Log line colors ──────────────────────────── */
+.log-info    { color: #94a3b8; }
+.log-success { color: #16a34a; }
+.log-warn    { color: #ca8a04; }
+.log-error   { color: #dc2626; }
+
+/* ── Activity & log panel heights ─────────────── */
+.activity-panel { height: clamp(400px, 65vh, 700px); }
+.log-panel      { height: clamp(250px, 38vh, 450px); }
+
+/* ── Result content (markdown rendered) ───────── */
+.result-content p { margin-bottom: 0.5rem; }
+.result-content p:last-child { margin-bottom: 0; }
+.result-content strong { font-weight: 600; }
+.result-content ul, .result-content ol { padding-left: 1.25rem; margin: 0.5rem 0; }
+.result-content li { margin-bottom: 0.25rem; }
+.result-content a { color: #93c5fd; text-decoration: underline; }
+.result-content code {
+  background: rgba(255,255,255,0.15); padding: 0.1rem 0.35rem;
+  border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
+}
+.result-content pre {
+  background: rgba(0,0,0,0.2); border-radius: 0.5rem;
+  padding: 0.75rem 1rem; overflow-x: auto; margin: 0.75rem 0;
+}
+.result-content pre code { background: none; padding: 0; }
+
+/* Markdown table */
+.result-content table {
+  width: 100%; border-collapse: collapse; margin: 0.75rem 0;
+  font-size: 0.85rem;
+}
+.result-content th {
+  background: rgba(255,255,255,0.12); text-align: left;
+  padding: 0.5rem 0.75rem; border-bottom: 2px solid rgba(255,255,255,0.15);
+  font-weight: 600; white-space: nowrap;
+}
+.result-content td {
+  padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.result-content tr:hover td { background: rgba(255,255,255,0.05); }
+
+/* ── Custom scrollbar ─────────────────────────── */
+.custom-scroll::-webkit-scrollbar { width: 4px; }
+.custom-scroll::-webkit-scrollbar-track { background: transparent; }
+.custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+
+/* ── Float animation ──────────────────────────── */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.animate-float { animation: float 3s ease-in-out infinite; }
+
+/* ── Status colors ────────────────────────────── */
+.status-running #status-dot { background: #eab308; animation: pulse-dot 1.5s infinite; }
+.status-running #status-chip { background: #fefce8; border-color: #fde047; color: #a16207; }
+.status-success #status-dot { background: #22c55e; }
+.status-success #status-chip { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.status-failed  #status-dot { background: #ef4444; }
+.status-failed  #status-chip { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }

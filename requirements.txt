@@ -1,0 +1,11 @@
+# Web-Automi Dependencies
+groq
+python-dotenv
+playwright
+playwright-stealth
+beautifulsoup4
+
+# Web server
+fastapi
+uvicorn[standard]
+pydantic

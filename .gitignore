@@ -63,6 +63,7 @@ venv.bak/
 # Project specific
 output.log
 browser_data/
+chats.db
 
 # OS generated files
 .DS_Store
