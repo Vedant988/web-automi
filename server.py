@@ -5,9 +5,9 @@ import os, sys, json, asyncio
 import queue as queue_module
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, Request, Response, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -18,7 +18,10 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from database import init_db, create_task, list_tasks, get_task, update_task, delete_task, add_step, get_steps
+from database import (
+    init_db, create_task, list_tasks, get_task, update_task, delete_task, add_step, get_steps,
+    register_user, login_user, logout_user, get_user_by_token
+)
 from agent_runner import AgentRunner
 
 runner = AgentRunner()
@@ -32,34 +35,80 @@ async def lifespan(app):
 app = FastAPI(title="Web-Automi", version="2.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+
+# ── Auth Dependency ─────────────────────────────────────────────
+def get_current_user(request: Request):
+    token = request.cookies.get("session_id")
+    user = get_user_by_token(token) if token else None
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    return user
+
+
+# ── Auth Endpoints ──────────────────────────────────────────────
+class AuthRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/register")
+def api_register(req: AuthRequest, response: Response):
+    user = register_user(req.username, req.password)
+    if not user:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    token = login_user(req.username, req.password)
+    response.set_cookie(key="session_id", value=token, httponly=True, max_age=86400 * 30) # 30 days
+    return {"ok": True, "user": user}
+
+@app.post("/api/login")
+def api_login(req: AuthRequest, response: Response):
+    token = login_user(req.username, req.password)
+    if not token:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    response.set_cookie(key="session_id", value=token, httponly=True, max_age=86400 * 30)
+    user = get_user_by_token(token)
+    return {"ok": True, "user": user}
+
+@app.post("/api/logout")
+def api_logout(request: Request, response: Response):
+    token = request.cookies.get("session_id")
+    if token:
+        logout_user(token)
+    response.delete_cookie("session_id")
+    return {"ok": True}
+
+@app.get("/api/me")
+def api_me(user: dict = Depends(get_current_user)):
+    return {"ok": True, "user": user}
+
+
 # ── REST endpoints ──────────────────────────────────────────────
 class RunTaskRequest(BaseModel):
     prompt: str
     model: str = "openai/gpt-oss-120b"
 
 @app.get("/api/tasks")
-def api_list_tasks():
-    return list_tasks()
+def api_list_tasks(user: dict = Depends(get_current_user)):
+    return list_tasks(user_id=user["id"])
 
 @app.get("/api/tasks/{task_id}")
-def api_get_task(task_id: str):
-    t = get_task(task_id)
+def api_get_task(task_id: str, user: dict = Depends(get_current_user)):
+    t = get_task(task_id, user_id=user["id"])
     if not t: raise HTTPException(404, "Not found")
     return {**t, "steps": get_steps(task_id)}
 
 @app.delete("/api/tasks/{task_id}")
-def api_delete_task(task_id: str):
-    if not delete_task(task_id): raise HTTPException(404, "Not found")
+def api_delete_task(task_id: str, user: dict = Depends(get_current_user)):
+    if not delete_task(task_id, user_id=user["id"]): raise HTTPException(404, "Not found")
     return {"ok": True}
 
 @app.post("/api/stop")
-def api_stop():
+def api_stop(user: dict = Depends(get_current_user)):
     if not runner.is_running: raise HTTPException(409, "Not running")
     runner.stop()
     return {"ok": True}
 
 @app.get("/api/status")
-def api_status():
+def api_status(user: dict = Depends(get_current_user)):
     return {"status": runner.status, "steps": len(runner.steps), "result": runner.result}
 
 # ── WebSocket endpoint ──────────────────────────────────────────
@@ -67,6 +116,14 @@ def api_status():
 async def ws_run(websocket: WebSocket):
     await websocket.accept()
     try:
+        # Auth check
+        token = websocket.cookies.get("session_id")
+        user = get_user_by_token(token) if token else None
+        if not user:
+            await websocket.send_json({"type": "error", "data": {"error": "Not authenticated. Please log in."}})
+            await websocket.close()
+            return
+
         data = await websocket.receive_json()
         prompt = (data.get("prompt") or "").strip()
         model = data.get("model", "openai/gpt-oss-120b")
@@ -78,7 +135,7 @@ async def ws_run(websocket: WebSocket):
             await websocket.send_json({"type": "error", "data": {"error": "Agent is already running a task. Please wait."}})
             return
 
-        task = create_task(prompt, model)
+        task = create_task(prompt, user_id=user["id"], model=model)
         task_id = task["id"]
         runner.start(prompt, model=model)
         await websocket.send_json({"type": "started", "data": {"task_id": task_id}})
@@ -123,6 +180,10 @@ async def ws_run(websocket: WebSocket):
 @app.get("/")
 async def serve_index():
     return FileResponse("static/index.html")
+
+@app.get("/auth")
+async def serve_auth():
+    return FileResponse("static/auth.html")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Auth - Web-Automi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  body { font-family: 'Public Sans', sans-serif; }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+
+<div class="bg-white p-8 rounded-xl shadow-md w-full max-w-sm border border-slate-200">
+  <div class="text-center mb-8">
+    <div class="w-12 h-12 bg-slate-800 text-white rounded-lg flex items-center justify-center text-xl font-bold mx-auto mb-3">AI</div>
+    <h1 class="text-2xl font-bold text-slate-800">Web-Automi</h1>
+    <p class="text-sm text-slate-500 mt-1">Sign in to your account</p>
+  </div>
+
+  <form id="auth-form" class="space-y-4">
+    <div id="error-msg" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-md border border-red-100"></div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
+      <input type="text" id="username" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm">
+    </div>
+    
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+      <input type="password" id="password" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm">
+    </div>
+
+    <button type="submit" id="btn-submit" class="w-full bg-slate-800 text-white font-medium py-2 rounded-md hover:bg-slate-900 transition-colors mt-2 text-sm">
+      Log In
+    </button>
+  </form>
+
+  <div class="mt-6 text-center text-sm text-slate-500">
+    <span id="toggle-text">Don't have an account?</span>
+    <button id="btn-toggle-mode" class="text-slate-800 font-semibold hover:underline ml-1 cursor-pointer">Sign up</button>
+  </div>
+</div>
+
+<script>
+  let isLogin = true;
+  const form = document.getElementById("auth-form");
+  const usernameInput = document.getElementById("username");
+  const passwordInput = document.getElementById("password");
+  const btnSubmit = document.getElementById("btn-submit");
+  const toggleBtn = document.getElementById("btn-toggle-mode");
+  const toggleText = document.getElementById("toggle-text");
+  const errorMsg = document.getElementById("error-msg");
+
+  toggleBtn.addEventListener("click", () => {
+    isLogin = !isLogin;
+    errorMsg.classList.add("hidden");
+    if (isLogin) {
+      btnSubmit.textContent = "Log In";
+      toggleText.textContent = "Don't have an account?";
+      toggleBtn.textContent = "Sign up";
+      document.querySelector("p").textContent = "Sign in to your account";
+    } else {
+      btnSubmit.textContent = "Create Account";
+      toggleText.textContent = "Already have an account?";
+      toggleBtn.textContent = "Log in";
+      document.querySelector("p").textContent = "Create a new account";
+    }
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errorMsg.classList.add("hidden");
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+    
+    if (!username || !password) return;
+
+    btnSubmit.disabled = true;
+    btnSubmit.classList.add("opacity-50");
+
+    const endpoint = isLogin ? "/api/login" : "/api/register";
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Authentication failed");
+      }
+      
+      // Success, redirect to dashboard
+      window.location.href = "/";
+    } catch (err) {
+      errorMsg.textContent = err.message;
+      errorMsg.classList.remove("hidden");
+    } finally {
+      btnSubmit.disabled = false;
+      btnSubmit.classList.remove("opacity-50");
+    }
+  });
+</script>
+
+</body>
+</html>

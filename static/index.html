@@ -68,10 +68,20 @@ tailwind.config = {
     <li><a class="nav-link" href="#" data-view="dashboard"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="sidebar-text font-medium text-sm">Dashboard</span></a></li>
     <li><a class="nav-link active" href="#" data-view="agent"><span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1;">precision_manufacturing</span><span class="sidebar-text text-sm">Agent Activity</span></a></li>
     <li><a class="nav-link" href="#" data-view="history"><span class="material-symbols-outlined text-[20px]">assignment</span><span class="sidebar-text font-medium text-sm">Task History</span></a></li>
-    <li><a class="nav-link" href="#" data-view="settings"><span class="material-symbols-outlined text-[20px]">settings</span><span class="sidebar-text font-medium text-sm">Settings</span></a></li>
   </ul>
 
-  <div class="px-6 sidebar-text mt-4">
+  <div class="px-6 sidebar-text mt-auto border-t border-slate-100 pt-4">
+    <!-- User Profile Area -->
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm" id="user-avatar">
+        <span class="material-symbols-outlined text-[16px]">person</span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-slate-800 truncate" id="user-name">Loading...</p>
+        <button id="btn-logout" class="text-xs text-red-500 hover:text-red-700 font-medium">Log out</button>
+      </div>
+    </div>
+    
     <div class="text-xs text-slate-400 font-medium">Model</div>
     <select id="setting-model" class="mt-1 w-full text-xs bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-slate-600 focus:ring-1 focus:ring-primary">
       <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>

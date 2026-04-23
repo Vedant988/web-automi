@@ -37,6 +37,10 @@ const resultBody    = document.getElementById("result-body");
 const historyList   = document.getElementById("history-list");
 const settingModel  = document.getElementById("setting-model");
 
+const userName      = document.getElementById("user-name");
+const userAvatar    = document.getElementById("user-avatar");
+const btnLogout     = document.getElementById("btn-logout");
+
 let isRunning = false;
 let ws = null;
 let stepCount = 0;
@@ -434,4 +438,26 @@ btnStopMobile.addEventListener("click", stopTask);
 taskInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runTask(taskInput.value); } });
 document.querySelectorAll(".example-chip").forEach(c => c.addEventListener("click", () => { taskInput.value = c.dataset.prompt; runTask(c.dataset.prompt); }));
 
-document.addEventListener("DOMContentLoaded", () => taskInput.focus());
+btnLogout.addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST" });
+  window.location.href = "/auth";
+});
+
+// Auth init
+async function initAuth() {
+  try {
+    const res = await fetch("/api/me");
+    if (!res.ok) {
+      window.location.href = "/auth";
+      return;
+    }
+    const data = await res.json();
+    userName.textContent = data.user.username;
+    userAvatar.innerHTML = `<span class="text-xs font-bold text-slate-600">${data.user.username.charAt(0).toUpperCase()}</span>`;
+    taskInput.focus();
+  } catch (err) {
+    window.location.href = "/auth";
+  }
+}
+
+document.addEventListener("DOMContentLoaded", initAuth);
