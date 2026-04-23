@@ -107,6 +107,7 @@ def _hash_password(password: str) -> str:
     return hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
 
 def register_user(username: str, password: str) -> dict | None:
+    username = username.strip().lower()
     now = datetime.now(timezone.utc).isoformat()
     pwd_hash = _hash_password(password)
     try:
@@ -121,6 +122,7 @@ def register_user(username: str, password: str) -> dict | None:
         return None # Username exists
 
 def login_user(username: str, password: str) -> str | None:
+    username = username.strip().lower()
     pwd_hash = _hash_password(password)
     with get_db() as conn:
         user = conn.execute(

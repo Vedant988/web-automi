@@ -56,7 +56,7 @@ def api_register(req: AuthRequest, response: Response):
     if not user:
         raise HTTPException(status_code=400, detail="Username already exists")
     token = login_user(req.username, req.password)
-    response.set_cookie(key="session_id", value=token, httponly=True, max_age=86400 * 30) # 30 days
+    response.set_cookie(key="session_id", value=token, httponly=True, max_age=86400 * 30, path="/") # 30 days
     return {"ok": True, "user": user}
 
 @app.post("/api/login")
@@ -64,7 +64,7 @@ def api_login(req: AuthRequest, response: Response):
     token = login_user(req.username, req.password)
     if not token:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    response.set_cookie(key="session_id", value=token, httponly=True, max_age=86400 * 30)
+    response.set_cookie(key="session_id", value=token, httponly=True, max_age=86400 * 30, path="/")
     user = get_user_by_token(token)
     return {"ok": True, "user": user}
 
@@ -73,7 +73,7 @@ def api_logout(request: Request, response: Response):
     token = request.cookies.get("session_id")
     if token:
         logout_user(token)
-    response.delete_cookie("session_id")
+    response.delete_cookie("session_id", path="/")
     return {"ok": True}
 
 @app.get("/api/me")
