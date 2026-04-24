@@ -140,14 +140,30 @@ function addStep(step) {
   if (ph) ph.remove();
 
   const isLast = step.type === "done" || step.type === "error";
+  
+  // Icon resolution based on status/type
+  let iconHTML = '';
+  if (step.status === 'success' || step.type === 'done') {
+      iconHTML = `<span class="material-symbols-outlined text-[12px] text-green-600 font-bold bg-green-100 rounded-full w-4 h-4 flex items-center justify-center absolute left-[-6px] top-[4px] z-10 shadow-[0_0_0_4px_rgba(34,197,94,0.15)]">check</span>`;
+  } else if (step.status === 'failed' || step.type === 'error') {
+      iconHTML = `<span class="material-symbols-outlined text-[12px] text-red-600 font-bold bg-red-100 rounded-full w-4 h-4 flex items-center justify-center absolute left-[-6px] top-[4px] z-10 shadow-[0_0_0_4px_rgba(239,68,68,0.15)]">close</span>`;
+  } else if (step.status === 'running') {
+      iconHTML = `<span class="material-symbols-outlined text-[12px] text-yellow-600 font-bold bg-yellow-100 rounded-full w-4 h-4 flex items-center justify-center absolute left-[-6px] top-[4px] z-10 shadow-[0_0_0_4px_rgba(234,179,8,0.15)] animate-spin" style="font-variation-settings: 'FILL' 1, 'wght' 600;">sync</span>`;
+  } else {
+      iconHTML = `<div class="step-dot ${step.status}"></div>`;
+  }
+
+  const titleStr = step.title ? step.title.replace(/[\u1000-\uFFFF]+/g, '').trim() : '';
+  const detailStr = step.detail ? step.detail.replace(/[\u1000-\uFFFF]+/g, '').trim() : '';
+
   const div = document.createElement("div");
   div.className = "relative pl-6";
   div.innerHTML = `
-    <div class="step-dot ${step.status}"></div>
+    ${iconHTML}
     ${!isLast ? '<div class="step-connector"></div>' : ''}
-    <p class="text-[11px] text-slate-400 font-medium mb-0.5">${formatTime(step.timestamp)}</p>
-    <p class="text-sm text-slate-700 font-medium">${esc(step.title)}</p>
-    ${step.detail ? `<div class="mt-1 bg-slate-50 rounded p-1.5 text-[11px] text-slate-500 font-mono border border-slate-100 break-all">${esc(step.detail)}</div>` : ''}
+    <p class="text-[11px] text-slate-500 font-medium mb-0.5">${formatTime(step.timestamp)}</p>
+    <p class="text-sm text-slate-800 font-medium">${esc(titleStr)}</p>
+    ${detailStr ? `<div class="mt-1 bg-slate-50 rounded p-1.5 text-[12px] text-slate-600 font-mono border border-slate-200 break-words">${esc(detailStr)}</div>` : ''}
   `;
   stepList.appendChild(div);
   stepList.scrollTop = stepList.scrollHeight;
@@ -157,7 +173,7 @@ function addStep(step) {
 // LOG RENDERING
 // ══════════════════════════════════════════════════════
 function addLog(step) {
-  const ph = logBody.querySelector("p.text-slate-400");
+  const ph = logBody.querySelector("p.text-slate-500, p.text-slate-400");
   if (ph) ph.remove();
 
   let cls = "log-info";
@@ -166,8 +182,11 @@ function addLog(step) {
   else if (step.status === "failed" || step.type === "error") { cls = "log-error"; tag = "error"; }
   else if (step.type === "browsing") { cls = "log-warn"; tag = "browser"; }
 
+  const titleStr = step.title ? step.title.replace(/[\u1000-\uFFFF]+/g, '').trim() : '';
+  const detailStr = step.detail ? step.detail.replace(/[\u1000-\uFFFF]+/g, '').trim() : '';
+
   const p = document.createElement("p");
-  p.innerHTML = `<span class="${cls}">[${tag}]</span> ${esc(step.title)}${step.detail ? ': ' + esc(step.detail.slice(0, 120)) : ''}`;
+  p.innerHTML = `<span class="${cls}">[${tag}]</span> ${esc(titleStr)}${detailStr ? ': ' + esc(detailStr.slice(0, 120)) : ''}`;
   logBody.appendChild(p);
   logBody.scrollTop = logBody.scrollHeight;
 }
@@ -284,8 +303,19 @@ function runTask(prompt) {
         break;
 
       case "step":
-        addStep(msg.data);
-        addLog(msg.data);
+        if (msg.data.type === "stream") {
+            if (resultCard.classList.contains("hidden")) {
+                setStatus("running", "Writing Response");
+                resultCard.classList.remove("hidden");
+                resultBody.innerHTML = "";
+                window.streamedResult = "";
+            }
+            window.streamedResult += (msg.data.detail || "");
+            resultBody.innerHTML = renderMarkdown(window.streamedResult);
+        } else {
+            addStep(msg.data);
+            addLog(msg.data);
+        }
         break;
 
       case "result":
@@ -461,3 +491,16 @@ async function initAuth() {
 }
 
 document.addEventListener("DOMContentLoaded", initAuth);
+
+// Copy logs
+const btnCopyLogs = document.getElementById("btn-copy-logs");
+if (btnCopyLogs) {
+  btnCopyLogs.addEventListener("click", () => {
+    const logText = Array.from(logBody.querySelectorAll('p')).map(p => p.innerText).join('\n');
+    navigator.clipboard.writeText(logText).then(() => {
+      const oldHtml = btnCopyLogs.innerHTML;
+      btnCopyLogs.innerHTML = `<span class="material-symbols-outlined text-[14px]">check</span> Copied`;
+      setTimeout(() => btnCopyLogs.innerHTML = oldHtml, 2000);
+    });
+  });
+}

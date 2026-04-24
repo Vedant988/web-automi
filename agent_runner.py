@@ -159,6 +159,18 @@ class StderrCapture(io.TextIOBase):
         # Ignore [usage], [rate-limit], generic [WARN] lines
         return None
 
+class StdoutCapture(io.StringIO):
+    def __init__(self, event_queue):
+        super().__init__()
+        self.event_queue = event_queue
+
+    def write(self, s):
+        if s:
+            now = datetime.now(timezone.utc).isoformat()
+            self.event_queue.put(AgentStep(0, "stream", "running", "", s, now))
+        return super().write(s)
+
+
 
 class AgentRunner:
     """Manages agent execution in a background thread with real-time step events."""
@@ -200,7 +212,7 @@ class AgentRunner:
 
         original_stderr, original_stdout = sys.stderr, sys.stdout
         capture = StderrCapture(self.event_queue, original_stderr)
-        stdout_capture = io.StringIO()
+        stdout_capture = StdoutCapture(self.event_queue)
 
         try:
             sys.stderr = capture

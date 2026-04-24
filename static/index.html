@@ -70,9 +70,9 @@ tailwind.config = {
     <li><a class="nav-link" href="#" data-view="history"><span class="material-symbols-outlined text-[20px]">assignment</span><span class="sidebar-text font-medium text-sm">Task History</span></a></li>
   </ul>
 
-  <div class="px-6 sidebar-text mt-auto border-t border-slate-100 pt-4">
+  <div class="px-6 sidebar-text mt-auto border-t border-slate-100 pt-4 pb-4">
     <!-- User Profile Area -->
-    <div class="flex items-center gap-3 mb-4">
+    <div class="flex items-center gap-3">
       <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm" id="user-avatar">
         <span class="material-symbols-outlined text-[16px]">person</span>
       </div>
@@ -81,14 +81,6 @@ tailwind.config = {
         <button id="btn-logout" class="text-xs text-red-500 hover:text-red-700 font-medium">Log out</button>
       </div>
     </div>
-    
-    <div class="text-xs text-slate-400 font-medium">Model</div>
-    <select id="setting-model" class="mt-1 w-full text-xs bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-slate-600 focus:ring-1 focus:ring-primary">
-      <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
-      <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
-      <option value="llama-3.1-8b-instant">Llama 3.1 8B (Fast)</option>
-      <option value="gemma2-9b-it">Gemma 2 9B</option>
-    </select>
   </div>
 </nav>
 
@@ -132,6 +124,12 @@ tailwind.config = {
 
     <!-- Desktop status and run button -->
     <div class="hidden md:flex items-center gap-3">
+      <select id="setting-model" class="text-xs bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-600 focus:ring-1 focus:ring-primary shadow-sm h-9">
+        <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
+        <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+        <option value="llama-3.1-8b-instant">Llama 3.1 8B (Fast)</option>
+        <option value="gemma2-9b-it">Gemma 2 9B</option>
+      </select>
       <span id="status-chip-desktop" class="status-chip-ui px-3 py-1 bg-slate-50 text-slate-500 rounded-full text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition-all">
         <span class="status-dot-ui w-1.5 h-1.5 rounded-full bg-slate-400 transition-colors"></span>
         <span class="status-label-ui">Idle</span>
@@ -177,7 +175,7 @@ tailwind.config = {
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
         <!-- Left: Agent Activity -->
-        <div class="lg:col-span-4 bg-white rounded-xl shadow-[0_4px_20px_rgba(45,90,110,0.05)] border border-slate-100 p-4 md:p-5 flex flex-col activity-panel">
+        <div class="lg:col-span-5 bg-white rounded-xl shadow-[0_4px_20px_rgba(45,90,110,0.05)] border border-slate-100 p-4 md:p-5 flex flex-col activity-panel">
           <div class="flex items-center justify-between mb-3 md:mb-4 pb-3 border-b border-slate-100">
             <h3 class="text-sm md:text-base font-semibold text-slate-800">Agent Activity</h3>
             <span id="step-count-badge" class="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-md text-[10px] md:text-xs font-mono font-semibold border border-slate-200">0 Steps</span>
@@ -188,19 +186,24 @@ tailwind.config = {
         </div>
 
         <!-- Right: Log + Result -->
-        <div class="lg:col-span-8 flex flex-col gap-4 md:gap-5">
+        <div class="lg:col-span-7 flex flex-col gap-4 md:gap-5">
           <!-- Browser / Terminal Log -->
-          <div class="flex-1 bg-white rounded-xl shadow-[0_4px_20px_rgba(45,90,110,0.05)] border border-slate-100 flex flex-col overflow-hidden log-panel">
-            <div class="bg-slate-50 border-b border-slate-100 px-3 md:px-4 py-2 md:py-2.5 flex items-center gap-2">
-              <div class="flex gap-1.5">
-                <div class="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-slate-300"></div>
-                <div class="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-slate-300"></div>
-                <div class="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-slate-300"></div>
+          <div class="flex-1 bg-[#1e1e1e] rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-slate-800 flex flex-col overflow-hidden log-panel relative">
+            <div class="bg-[#2d2d2d] border-b border-slate-700 px-3 md:px-4 py-2 md:py-2.5 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="flex gap-1.5">
+                  <div class="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-[#ff5f56]"></div>
+                  <div class="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-[#ffbd2e]"></div>
+                  <div class="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-[#27c93f]"></div>
+                </div>
+                <div class="ml-2 md:ml-4 text-[10px] md:text-xs text-slate-400 font-mono">execution-log</div>
               </div>
-              <div class="ml-2 md:ml-4 flex-1 bg-white border border-slate-200 rounded-md py-1 px-2 md:px-3 text-[10px] md:text-xs text-slate-500 font-mono text-center shadow-sm truncate" id="log-title">automation-viewer // execution-log</div>
+              <button id="btn-copy-logs" class="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1 font-medium bg-[#3d3d3d] px-2 py-1 rounded-md">
+                <span class="material-symbols-outlined text-[14px]">content_copy</span> Copy
+              </button>
             </div>
-            <div id="log-body" class="p-3 md:p-4 bg-slate-50/50 flex-1 overflow-y-auto font-mono text-[11px] md:text-[13px] text-slate-600 space-y-1 md:space-y-1.5 custom-scroll min-h-[150px] md:min-h-[200px]">
-              <p class="text-slate-400 text-center py-6">Waiting for agent to start…</p>
+            <div id="log-body" class="p-3 md:p-4 bg-[#1e1e1e] flex-1 overflow-y-auto font-mono text-[11px] md:text-[13px] text-[#d4d4d4] space-y-1 md:space-y-1.5 custom-scroll min-h-[150px] md:min-h-[200px] break-words">
+              <p class="text-slate-500 text-center py-6">Waiting for agent to start…</p>
             </div>
           </div>
 
