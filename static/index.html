@@ -173,9 +173,9 @@ tailwind.config = {
         <h2 class="text-xl md:text-2xl font-bold text-slate-800">Agent Details</h2>
         <p class="text-xs md:text-sm text-slate-500 mt-1">Reviewing execution steps and real-time output.</p>
       </div>
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 items-start">
         <!-- Left: Agent Activity -->
-        <div class="lg:col-span-5 bg-white rounded-xl shadow-[0_4px_20px_rgba(45,90,110,0.05)] border border-slate-100 p-4 md:p-5 flex flex-col activity-panel">
+        <div class="lg:col-span-5 bg-white rounded-xl shadow-[0_4px_20px_rgba(45,90,110,0.05)] border border-slate-100 p-4 md:p-5 flex flex-col activity-panel lg:sticky lg:top-[120px] lg:z-10">
           <div class="flex items-center justify-between mb-3 md:mb-4 pb-3 border-b border-slate-100">
             <h3 class="text-sm md:text-base font-semibold text-slate-800">Agent Activity</h3>
             <span id="step-count-badge" class="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-md text-[10px] md:text-xs font-mono font-semibold border border-slate-200">0 Steps</span>

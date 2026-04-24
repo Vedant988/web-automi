@@ -65,7 +65,7 @@
 .log-error   { color: #dc2626; }
 
 /* ── Activity & log panel heights ─────────────── */
-.activity-panel { height: clamp(400px, 65vh, 700px); word-break: normal; overflow-wrap: break-word; }
+.activity-panel { height: clamp(400px, calc(100vh - 160px), 850px); word-break: normal; overflow-wrap: break-word; }
 .log-panel      { height: clamp(250px, 38vh, 450px); }
 
 /* ── Result content (markdown rendered) ───────── */
