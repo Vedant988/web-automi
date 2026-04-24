@@ -144,11 +144,11 @@ function addStep(step) {
   // Icon resolution based on status/type
   let iconHTML = '';
   if (step.status === 'success' || step.type === 'done') {
-      iconHTML = `<span class="material-symbols-outlined text-[12px] text-green-600 font-bold bg-green-100 rounded-full w-4 h-4 flex items-center justify-center absolute left-[-6px] top-[4px] z-10 shadow-[0_0_0_4px_rgba(34,197,94,0.15)]">check</span>`;
+      iconHTML = `<span class="material-symbols-outlined text-[12px] text-green-400 font-bold bg-green-500/20 rounded-full w-4 h-4 flex items-center justify-center absolute left-[-6px] top-[4px] z-10 shadow-[0_0_0_4px_rgba(74,222,128,0.2)]">check</span>`;
   } else if (step.status === 'failed' || step.type === 'error') {
-      iconHTML = `<span class="material-symbols-outlined text-[12px] text-red-600 font-bold bg-red-100 rounded-full w-4 h-4 flex items-center justify-center absolute left-[-6px] top-[4px] z-10 shadow-[0_0_0_4px_rgba(239,68,68,0.15)]">close</span>`;
+      iconHTML = `<span class="material-symbols-outlined text-[12px] text-red-400 font-bold bg-red-500/20 rounded-full w-4 h-4 flex items-center justify-center absolute left-[-6px] top-[4px] z-10 shadow-[0_0_0_4px_rgba(248,113,113,0.2)]">close</span>`;
   } else if (step.status === 'running') {
-      iconHTML = `<span class="material-symbols-outlined text-[12px] text-yellow-600 font-bold bg-yellow-100 rounded-full w-4 h-4 flex items-center justify-center absolute left-[-6px] top-[4px] z-10 shadow-[0_0_0_4px_rgba(234,179,8,0.15)] animate-spin" style="font-variation-settings: 'FILL' 1, 'wght' 600;">sync</span>`;
+      iconHTML = `<span class="material-symbols-outlined text-[12px] text-yellow-400 font-bold bg-yellow-500/20 rounded-full w-4 h-4 flex items-center justify-center absolute left-[-6px] top-[4px] z-10 shadow-[0_0_0_4px_rgba(250,204,21,0.2)] animate-spin" style="font-variation-settings: 'FILL' 1, 'wght' 600;">sync</span>`;
   } else {
       iconHTML = `<div class="step-dot ${step.status}"></div>`;
   }
@@ -161,9 +161,9 @@ function addStep(step) {
   div.innerHTML = `
     ${iconHTML}
     ${!isLast ? '<div class="step-connector"></div>' : ''}
-    <p class="text-[11px] text-slate-500 font-medium mb-0.5">${formatTime(step.timestamp)}</p>
-    <p class="text-sm text-slate-800 font-medium">${esc(titleStr)}</p>
-    ${detailStr ? `<div class="mt-1 bg-slate-50 rounded p-1.5 text-[12px] text-slate-600 font-mono border border-slate-200 break-words">${esc(detailStr)}</div>` : ''}
+    <p class="text-[11px] text-zinc-400 font-medium mb-0.5">${formatTime(step.timestamp)}</p>
+    <p class="text-sm text-zinc-100 font-medium">${esc(titleStr)}</p>
+    ${detailStr ? `<div class="mt-1 bg-white/5 rounded p-1.5 text-[12px] text-zinc-400 font-mono border border-white/10 break-words">${esc(detailStr)}</div>` : ''}
   `;
   stepList.appendChild(div);
   stepList.scrollTop = stepList.scrollHeight;
@@ -173,7 +173,7 @@ function addStep(step) {
 // LOG RENDERING
 // ══════════════════════════════════════════════════════
 function addLog(step) {
-  const ph = logBody.querySelector("p.text-slate-500, p.text-slate-400");
+  const ph = logBody.querySelector("p.text-zinc-400, p.text-slate-400");
   if (ph) ph.remove();
 
   let cls = "log-info";
@@ -388,7 +388,7 @@ async function loadHistory() {
     historyList.innerHTML = tasks.map(t => `
       <div class="bg-white rounded-xl border border-slate-100 p-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:border-slate-300 transition cursor-pointer flex items-start justify-between gap-4" onclick="viewTask('${t.id}')">
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-slate-800 truncate">${esc(t.prompt)}</p>
+          <p class="text-sm font-medium text-zinc-100 truncate">${esc(t.prompt)}</p>
           <div class="flex items-center gap-3 mt-2">
             <span class="text-[11px] font-semibold uppercase px-2 py-0.5 rounded ${t.status === 'completed' ? 'bg-green-50 text-green-700 border border-green-200' : t.status === 'failed' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}">${t.status}</span>
             <span class="text-[11px] text-slate-400">${timeAgo(t.created_at)}</span>
@@ -489,7 +489,7 @@ async function initAuth() {
     }
     const data = await res.json();
     userName.textContent = data.user.username;
-    userAvatar.innerHTML = `<span class="text-xs font-bold text-slate-600">${data.user.username.charAt(0).toUpperCase()}</span>`;
+    userAvatar.innerHTML = `<span class="text-xs font-bold text-zinc-400">${data.user.username.charAt(0).toUpperCase()}</span>`;
     taskInput.focus();
   } catch (err) {
     window.location.href = "/auth";
