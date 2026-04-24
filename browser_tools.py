@@ -625,14 +625,24 @@ def force_kill_browser():
     """
     Forcefully kills any dangling Chrome/Chromium zombie processes.
     Crucial for Render's lower-tier containers where processes can hang.
+    Uses psutil to avoid reliance on OS-level pkill which may be missing in minimal Docker images.
     """
-    import subprocess
     try:
-        subprocess.run(["pkill", "-9", "-f", "chrome"], check=False, capture_output=True)
-        subprocess.run(["pkill", "-9", "-f", "chromium"], check=False, capture_output=True)
-        print("[System] Forcefully killed all Chromium processes.", file=sys.stderr, flush=True)
+        import psutil
+        killed_count = 0
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                name = (proc.info['name'] or '').lower()
+                if 'chrome' in name or 'chromium' in name:
+                    proc.kill()
+                    killed_count += 1
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+        print(f"[System] Forcefully killed {killed_count} Chromium processes via psutil.", file=sys.stderr, flush=True)
+    except ImportError:
+        print("[System] psutil not installed. Cannot force kill browser.", file=sys.stderr, flush=True)
     except Exception as e:
-        print(f"[System] Error killing browser: {e}", file=sys.stderr, flush=True)
+        print(f"[System] Error killing browser with psutil: {e}", file=sys.stderr, flush=True)
 
 async def get_browser_and_page(p, is_search=False):
     """
