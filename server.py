@@ -40,7 +40,7 @@ async def lifespan(app):
         global global_playwright, global_browser
         global_playwright = await async_playwright().start()
         global_browser = await global_playwright.chromium.launch(
-            headless=True,
+            headless=False,
             args=[
                 "--remote-debugging-port=9222",
                 "--disable-blink-features=AutomationControlled",
