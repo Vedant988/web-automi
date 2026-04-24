@@ -8,6 +8,12 @@
 .sidebar-nav.collapsed ~ #main-wrapper { margin-left: 4rem; }
 .sidebar-nav.collapsed ~ #main-wrapper #topbar,
 .sidebar-nav.collapsed ~ #main-wrapper #footer { left: 4rem; }
+/* Center logo area when collapsed */
+.sidebar-nav.collapsed .logo-area {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
 
 /* ── Nav links ────────────────────────────────── */
 .nav-link {
@@ -119,3 +125,25 @@
 .status-success #status-chip { background: #f0fdf4; border-color: #86efac; color: #15803d; }
 .status-failed  #status-dot { background: #ef4444; }
 .status-failed  #status-chip { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+/* ── Search pill ──────────────────────────────── */
+.search-pill {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+/* Suppress the Tailwind forms-plugin border/ring on the inner input */
+.search-pill input {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+.search-pill input::placeholder {
+  color: #94a3b8;
+}
+
+/* ── Sidebar logo img ─────────────────────────── */
+.sidebar-nav img[alt="Web-Automi"] {
+  filter: drop-shadow(0 1px 4px rgba(16,67,86,0.18));
+}
+

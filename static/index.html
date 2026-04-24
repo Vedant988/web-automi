@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>AI Automation Dashboard</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -46,9 +46,9 @@ tailwind.config = {
 
 <!-- ═══ SIDEBAR ═══ -->
 <nav id="sidebar" class="sidebar-nav bg-white h-screen fixed left-0 top-0 w-64 border-r border-slate-200 shadow-[0_4px_20px_rgba(45,90,110,0.05)] flex flex-col py-6 z-50 transition-transform duration-300 -translate-x-full md:translate-x-0">
-  <div class="px-6 mb-8 flex items-center justify-between">
+  <div class="logo-area px-6 mb-8 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-xl shrink-0">AI</div>
+      <img src="/static/logo.png" alt="Web-Automi" class="w-10 h-10 shrink-0 object-contain" />
       <div class="sidebar-text">
         <h1 class="text-lg font-bold text-primary leading-tight">Web-Automi</h1>
         <span class="text-xs text-slate-500 font-medium">Automation Hub</span>
@@ -88,43 +88,28 @@ tailwind.config = {
 <div id="main-wrapper" class="flex-1 ml-0 md:ml-64 flex flex-col min-h-screen transition-all duration-300 w-full relative">
 
   <!-- Top Bar -->
-  <header class="bg-white/90 backdrop-blur-md fixed top-0 right-0 left-0 md:left-64 h-auto md:h-16 border-b border-slate-200 z-30 flex flex-col md:flex-row md:items-center justify-between px-4 md:px-8 py-3 md:py-0 transition-all duration-300 shadow-sm md:shadow-none" id="topbar">
+  <header class="bg-white/90 backdrop-blur-md fixed top-0 right-0 left-0 md:left-64 h-16 border-b border-slate-100 z-30 flex items-center justify-between px-4 md:px-8 transition-all duration-300" id="topbar">
     
-    <!-- Mobile top row -->
-    <div class="flex items-center justify-between w-full md:w-auto mb-3 md:mb-0">
-      <div class="flex items-center gap-3">
-        <button id="btn-sidebar-open" class="md:hidden text-slate-500 hover:text-slate-800 focus:outline-none">
-          <span class="material-symbols-outlined text-[24px]">menu</span>
-        </button>
-        <span class="text-base md:text-lg font-black text-slate-800">Automation Studio</span>
-      </div>
-      
-      <!-- Mobile status and run button (moved to top row on mobile) -->
-      <div class="flex md:hidden items-center gap-2">
-        <span id="status-chip-mobile" class="status-chip-ui px-2 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-semibold flex items-center gap-1 border border-slate-200">
-          <span class="status-dot-ui w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-          <span class="status-label-ui">Idle</span>
-        </span>
-        <button id="btn-run-mobile" class="btn-run-ui bg-primary text-white p-1.5 rounded-lg transition-colors flex items-center justify-center">
-          <span class="material-symbols-outlined text-[18px]">play_arrow</span>
-        </button>
-        <button id="btn-stop-mobile" class="btn-stop-ui hidden bg-red-500 text-white p-1.5 rounded-lg transition-colors flex items-center justify-center">
-          <span class="material-symbols-outlined text-[18px]">stop</span>
-        </button>
+    <!-- Left: Title + mobile menu -->
+    <div class="flex items-center gap-3 shrink-0">
+      <button id="btn-sidebar-open" class="md:hidden text-slate-500 hover:text-slate-800 focus:outline-none">
+        <span class="material-symbols-outlined text-[24px]">menu</span>
+      </button>
+      <span class="text-base md:text-lg font-bold text-slate-800">Automation Studio</span>
+    </div>
+
+    <!-- Centre: Search pill with embedded Run button -->
+    <div class="flex-1 max-w-2xl mx-4 md:mx-8">
+      <div class="search-pill flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-1.5 shadow-sm focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(16,67,86,0.08)] transition-all">
+        <input id="task-input" class="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none min-w-0" placeholder='Describe your task — e.g. "Find IPL scores"' type="text" autocomplete="off"/>
+        <button id="btn-run-desktop" class="btn-run-ui bg-primary hover:bg-[#0d3848] text-white px-4 py-1.5 rounded-full font-semibold text-sm transition-colors shrink-0">Run</button>
+        <button id="btn-stop-desktop" class="btn-stop-ui hidden bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded-full font-semibold text-sm transition-colors shrink-0">Stop</button>
       </div>
     </div>
 
-    <!-- Search Input -->
-    <div class="flex-1 w-full md:max-w-xl md:mx-8">
-      <div class="relative">
-        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
-        <input id="task-input" class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all placeholder:text-slate-400" placeholder="Describe your task — e.g. &quot;Find IPL scores&quot;" type="text" autocomplete="off"/>
-      </div>
-    </div>
-
-    <!-- Desktop status and run button -->
-    <div class="hidden md:flex items-center gap-3">
-      <select id="setting-model" class="text-xs bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-600 focus:ring-1 focus:ring-primary shadow-sm h-9">
+    <!-- Right: Model + status -->
+    <div class="flex items-center gap-2 shrink-0">
+      <select id="setting-model" class="hidden md:block text-xs bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-600 focus:ring-1 focus:ring-primary h-8">
         <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
         <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
         <option value="llama-3.1-8b-instant">Llama 3.1 8B (Fast)</option>
@@ -135,28 +120,34 @@ tailwind.config = {
         <span class="status-label-ui">Idle</span>
       </span>
       <span id="step-badge" class="hidden px-2 py-1 bg-slate-50 text-slate-600 rounded-md text-xs font-mono font-semibold border border-slate-200">Step <span id="step-num">0</span></span>
-      <button id="btn-run-desktop" class="btn-run-ui bg-primary hover:bg-primary/90 text-white px-5 py-2 rounded-lg font-semibold text-sm transition-colors flex items-center gap-2 shadow-sm">
-        <span class="material-symbols-outlined text-[18px]">play_arrow</span> Run
+      <!-- Mobile run/stop -->
+      <button id="btn-run-mobile" class="btn-run-ui md:hidden bg-primary text-white p-1.5 rounded-full transition-colors">
+        <span class="material-symbols-outlined text-[18px]">play_arrow</span>
       </button>
-      <button id="btn-stop-desktop" class="btn-stop-ui hidden bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors flex items-center gap-2">
-        <span class="material-symbols-outlined text-[18px]">stop</span> Stop
+      <button id="btn-stop-mobile" class="btn-stop-ui hidden md:hidden bg-red-500 text-white p-1.5 rounded-full transition-colors">
+        <span class="material-symbols-outlined text-[18px]">stop</span>
       </button>
+      <!-- mobile status -->
+      <span id="status-chip-mobile" class="status-chip-ui md:hidden px-2 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-semibold flex items-center gap-1 border border-slate-200">
+        <span class="status-dot-ui w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+        <span class="status-label-ui">Idle</span>
+      </span>
     </div>
   </header>
 
   <!-- Error Banner -->
-  <div id="error-banner" class="hidden fixed top-[100px] md:top-16 right-0 left-0 md:left-64 z-20 bg-red-50 border-b border-red-200 px-4 md:px-8 py-2 flex items-center gap-3 text-xs md:text-sm text-red-700 font-medium transition-all duration-300">
+  <div id="error-banner" class="hidden fixed top-16 right-0 left-0 md:left-64 z-20 bg-red-50 border-b border-red-200 px-4 md:px-8 py-2 flex items-center gap-3 text-xs md:text-sm text-red-700 font-medium transition-all duration-300">
     <span class="material-symbols-outlined text-[16px] md:text-[18px]">error</span>
     <span id="error-text" class="flex-1 truncate"></span>
     <button id="btn-dismiss-error" class="ml-auto text-red-500 hover:text-red-700 text-xs font-semibold shrink-0">Dismiss</button>
   </div>
 
   <!-- ═══ MAIN CONTENT ═══ -->
-  <main class="flex-1 pt-[120px] md:pt-24 pb-20 md:pb-16 px-4 md:px-8 max-w-[1600px] mx-auto w-full">
+  <main class="flex-1 pt-20 pb-16 px-4 md:px-8 max-w-[1600px] mx-auto w-full">
 
     <!-- Welcome state -->
     <div id="welcome-pane" class="flex flex-col items-center justify-center py-10 md:py-20 px-4">
-      <div class="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-2xl md:text-3xl mb-4 md:mb-6 animate-float">AI</div>
+      <img src="/static/logo.png" alt="Web-Automi" class="w-20 h-20 md:w-24 md:h-24 object-contain mb-4 md:mb-6 animate-float" />
       <h2 class="text-2xl md:text-3xl font-bold text-slate-800 mb-2">Web-Automi</h2>
       <p class="text-slate-500 text-xs md:text-sm mb-6 md:mb-8 max-w-md text-center">Autonomous AI web agent — searches, navigates, and extracts real-time information for you.</p>
       <div class="flex flex-wrap gap-2 justify-center max-w-lg">
