@@ -142,7 +142,6 @@ BLOCKED_PAGE_SIGNALS = (
     "ray id",
     "403 forbidden",
     "429 too many requests",
-    "blocked",
 )
 
 SEARCH_USER_AGENT = (
@@ -650,11 +649,26 @@ async def get_browser_and_page(p, is_search=False):
     If none found, launches a local persistent Chromium.
     Returns: (browser_or_none, context, page, is_remote)
     """
+        # Apply highly natural browser headers universally to evade advanced bot walls
+        extra_headers = {
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1"
+        }
+
     try:
         browser = await p.chromium.connect_over_cdp("http://localhost:9222")
         print("[browser-use] Connected to existing Chrome instance on port 9222", file=sys.stderr, flush=True)
         context = browser.contexts[0] if browser.contexts else await browser.new_context()
         page = await context.new_page()
+        await page.set_extra_http_headers(extra_headers)
         return browser, context, page, True
     except Exception:
         print("[browser-use] No running Chrome found on port 9222. Launching persistent Chromium...", file=sys.stderr, flush=True)
@@ -672,20 +686,6 @@ async def get_browser_and_page(p, is_search=False):
             "--window-size=1920,1080",
             "--disable-extensions",
         ]
-        
-        # Apply highly natural browser headers universally to evade advanced bot walls
-        extra_headers = {
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Windows"',
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Upgrade-Insecure-Requests": "1"
-        }
 
         try:
             if SELECTED_CHROME_PROFILE:
@@ -802,7 +802,11 @@ async def search_web(query: str, timeout: int = 90) -> str:
                             )
                             continue
 
-                        title = await page.title()
+                        try:
+                            title = await page.title()
+                        except Exception:
+                            title = ""
+                            
                         try:
                             body_text = await page.locator("body").inner_text(timeout=5000)
                         except Exception:
