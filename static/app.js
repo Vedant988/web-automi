@@ -44,6 +44,7 @@ const btnLogout     = document.getElementById("btn-logout");
 let isRunning = false;
 let ws = null;
 let stepCount = 0;
+let elapsedTimer = null;   // live elapsed ticker
 
 // ══════════════════════════════════════════════════════
 // SIDEBAR
@@ -127,6 +128,11 @@ function resetAgent() {
   stepCountBadge.textContent = "0 Steps";
   stepBadge.classList.add("hidden");
   stepNum.textContent = "0";
+  // Clear timing displays
+  const rt = document.getElementById("result-timing");
+  const rl = document.getElementById("result-latency-label");
+  if (rt) rt.innerHTML = "";
+  if (rl) rl.classList.add("hidden");
 }
 
 function addStep(step) {
@@ -289,6 +295,13 @@ function runTask(prompt) {
   document.querySelectorAll(".btn-stop-ui").forEach(b => b.classList.remove("hidden"));
   taskInput.disabled = true;
 
+  // Live elapsed timer — update status chip every second
+  if (elapsedTimer) clearInterval(elapsedTimer);
+  elapsedTimer = setInterval(() => {
+    const s = ((Date.now() - taskStartTime) / 1000).toFixed(0);
+    document.querySelectorAll(".status-label-ui").forEach(el => el.textContent = `Running ${s}s`);
+  }, 1000);
+
   const model = settingModel.value;
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   ws = new WebSocket(`${protocol}//${location.host}/ws/run`);
@@ -329,10 +342,26 @@ function runTask(prompt) {
           resultBody.innerHTML = `<p style="color:#fca5a5;">${esc(msg.data.result || "An error occurred.")}</p>`;
         } else {
           const elapsed = ((Date.now() - taskStartTime) / 1000).toFixed(1);
-          setStatus("success", `Completed in ${elapsed}s`);
+          setStatus("success", `Done in ${elapsed}s`);
           resultCard.classList.remove("hidden");
           if (!window.streamedResult) {
               resultBody.innerHTML = renderMarkdown(msg.data.result || "No result.");
+          }
+          // Populate timing badge in card header
+          const rt = document.getElementById("result-timing");
+          if (rt) {
+            rt.innerHTML = `
+              <span class="flex items-center gap-1 bg-white/15 text-white/90 rounded-full px-2.5 py-0.5 text-xs font-mono border border-white/20">
+                <span class="material-symbols-outlined text-[13px]">timer</span>
+                ${elapsed}s
+              </span>`;
+          }
+          // Populate latency label at the bottom
+          const rl = document.getElementById("result-latency-label");
+          const rlt = document.getElementById("result-latency-text");
+          if (rl && rlt) {
+            rlt.textContent = `End-to-end latency: ${elapsed}s`;
+            rl.classList.remove("hidden");
           }
         }
         break;
@@ -361,6 +390,7 @@ function runTask(prompt) {
 
 function finishRun() {
   isRunning = false;
+  if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
   document.querySelectorAll(".btn-run-ui").forEach(b => b.classList.remove("hidden"));
   document.querySelectorAll(".btn-stop-ui").forEach(b => b.classList.add("hidden"));
   taskInput.disabled = false;
