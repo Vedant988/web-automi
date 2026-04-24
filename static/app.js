@@ -269,9 +269,12 @@ function renderInline(text) {
 // ══════════════════════════════════════════════════════
 // WEBSOCKET — RUN TASK
 // ══════════════════════════════════════════════════════
+let taskStartTime = 0;
+
 function runTask(prompt) {
   if (isRunning || !prompt.trim()) return;
   isRunning = true;
+  taskStartTime = Date.now();
   hideError();
   resetAgent();
   showView("agent");
@@ -325,9 +328,12 @@ function runTask(prompt) {
           resultCard.classList.remove("hidden");
           resultBody.innerHTML = `<p style="color:#fca5a5;">${esc(msg.data.result || "An error occurred.")}</p>`;
         } else {
-          setStatus("success", "Completed");
+          const elapsed = ((Date.now() - taskStartTime) / 1000).toFixed(1);
+          setStatus("success", `Completed in ${elapsed}s`);
           resultCard.classList.remove("hidden");
-          resultBody.innerHTML = renderMarkdown(msg.data.result || "No result.");
+          if (!window.streamedResult) {
+              resultBody.innerHTML = renderMarkdown(msg.data.result || "No result.");
+          }
         }
         break;
 

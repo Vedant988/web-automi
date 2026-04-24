@@ -26,11 +26,39 @@ from agent_runner import AgentRunner
 
 runner = AgentRunner()
 
+global_playwright = None
+global_browser = None
+
 @asynccontextmanager
 async def lifespan(app):
     init_db()
     print("[server] Database initialized — http://localhost:8000")
+    
+    # Launch persistent browser for context reuse
+    try:
+        from playwright.async_api import async_playwright
+        global global_playwright, global_browser
+        global_playwright = await async_playwright().start()
+        global_browser = await global_playwright.chromium.launch(
+            headless=True,
+            args=[
+                "--remote-debugging-port=9222",
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu"
+            ]
+        )
+        print("[server] Global Chromium launched on port 9222 for context reuse")
+    except Exception as e:
+        print(f"[server] Warning: Could not launch global Chromium: {e}")
+        
     yield
+
+    if global_browser:
+        await global_browser.close()
+    if global_playwright:
+        await global_playwright.stop()
 
 app = FastAPI(title="Web-Automi", version="2.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
