@@ -541,7 +541,7 @@ async def extract_search_results(page, selectors: dict, limit: int = 5) -> list[
     return normalized
 
 
-async def visit_result_pages(context, results: list[dict], per_page_timeout_ms: int = 12000) -> list[dict]:
+async def visit_result_pages(context, results: list[dict], per_page_timeout_ms: int = 30000) -> list[dict]:
     """
     Visit the top result pages and return an excerpt from each.
 
@@ -621,6 +621,19 @@ async def visit_result_pages(context, results: list[dict], per_page_timeout_ms: 
 
     return visited
 
+def force_kill_browser():
+    """
+    Forcefully kills any dangling Chrome/Chromium zombie processes.
+    Crucial for Render's lower-tier containers where processes can hang.
+    """
+    import subprocess
+    try:
+        subprocess.run(["pkill", "-9", "-f", "chrome"], check=False, capture_output=True)
+        subprocess.run(["pkill", "-9", "-f", "chromium"], check=False, capture_output=True)
+        print("[System] Forcefully killed all Chromium processes.", file=sys.stderr, flush=True)
+    except Exception as e:
+        print(f"[System] Error killing browser: {e}", file=sys.stderr, flush=True)
+
 async def get_browser_and_page(p, is_search=False):
     """
     Tries to connect to an existing Chrome instance on port 9222.
@@ -635,6 +648,7 @@ async def get_browser_and_page(p, is_search=False):
         return browser, context, page, True
     except Exception:
         print("[browser-use] No running Chrome found on port 9222. Launching persistent Chromium...", file=sys.stderr, flush=True)
+        force_kill_browser()
         import os
         global SELECTED_CHROME_PROFILE
         is_headless = bool(os.environ.get("HEADLESS"))
@@ -878,6 +892,7 @@ async def search_web(query: str, timeout: int = 90) -> str:
         
     except asyncio.TimeoutError:
         print(f"[browser-use] [TIMEOUT] Browser search exceeded {timeout}s timeout", file=sys.stderr, flush=True)
+        force_kill_browser()
         return f"Timeout: Web search exceeded {timeout} seconds"
     except ImportError as e:
         print(f"[browser-use] [ERROR] ImportError: {e}", file=sys.stderr, flush=True)
@@ -1014,6 +1029,8 @@ async def navigate_url(
         )
         return result
     except asyncio.TimeoutError:
+        print(f"[navigate_url] [TIMEOUT] navigate_url exceeded {timeout}s", file=sys.stderr, flush=True)
+        force_kill_browser()
         return f"Timeout: navigate_url exceeded {timeout}s"
     except Exception as exc:
         import traceback
