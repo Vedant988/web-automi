@@ -160,14 +160,18 @@ class StderrCapture(io.TextIOBase):
         return None
 
 class StdoutCapture(io.StringIO):
-    def __init__(self, event_queue):
+    def __init__(self, event_queue, original_stdout=None):
         super().__init__()
         self.event_queue = event_queue
+        self.original_stdout = original_stdout
 
     def write(self, s):
         if s:
             now = datetime.now(timezone.utc).isoformat()
             self.event_queue.put(AgentStep(0, "stream", "running", "", s, now))
+        if self.original_stdout:
+            self.original_stdout.write(s)
+            self.original_stdout.flush()
         return super().write(s)
 
 
@@ -212,7 +216,7 @@ class AgentRunner:
 
         original_stderr, original_stdout = sys.stderr, sys.stdout
         capture = StderrCapture(self.event_queue, original_stderr)
-        stdout_capture = StdoutCapture(self.event_queue)
+        stdout_capture = StdoutCapture(self.event_queue, original_stdout)
 
         try:
             sys.stderr = capture
