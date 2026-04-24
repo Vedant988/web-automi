@@ -266,9 +266,14 @@ function renderMarkdown(text) {
 
 function renderInline(text) {
   let t = esc(text);
+  t = t.replace(/&lt;br\s*\/?&gt;/gi, "<br/>");
   t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
   t = t.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  t = t.replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank">$1</a>');
+  t = t.replace(/(https?:\/\/[^\s<)]+)/g, (match) => {
+    let url = match;
+    if (url.endsWith('&quot;')) url = url.slice(0, -6);
+    return `<a href="${url}" target="_blank">${url}</a>`;
+  });
   return t;
 }
 
