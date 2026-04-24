@@ -469,10 +469,19 @@ function timeAgo(iso) {
 // ══════════════════════════════════════════════════════
 btnRunDesktop.addEventListener("click", () => runTask(taskInput.value));
 btnStopDesktop.addEventListener("click", stopTask);
-btnRunMobile.addEventListener("click", () => runTask(taskInput.value));
+btnRunMobile.addEventListener("click", () => runTask(taskInput.value || taskInputMobile.value));
 btnStopMobile.addEventListener("click", stopTask);
 taskInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runTask(taskInput.value); } });
-document.querySelectorAll(".example-chip").forEach(c => c.addEventListener("click", () => { taskInput.value = c.dataset.prompt; runTask(c.dataset.prompt); }));
+
+// Mobile search input — sync bidirectionally with desktop input
+const taskInputMobile = document.getElementById("task-input-mobile");
+if (taskInputMobile) {
+  taskInputMobile.addEventListener("input", () => { taskInput.value = taskInputMobile.value; });
+  taskInputMobile.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runTask(taskInputMobile.value); } });
+  taskInput.addEventListener("input", () => { taskInputMobile.value = taskInput.value; });
+}
+
+document.querySelectorAll(".example-chip").forEach(c => c.addEventListener("click", () => { taskInput.value = c.dataset.prompt; if (taskInputMobile) taskInputMobile.value = c.dataset.prompt; runTask(c.dataset.prompt); }));
 
 btnLogout.addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST" });
