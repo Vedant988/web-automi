@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from groq import Groq
 from collections import deque
 from urllib.parse import parse_qs, quote_plus, unquote, urlparse
-from prompts import TOOLS, FINAL_ANSWER_SYSTEM_PROMPT, get_system_prompt
+from prompts import TOOLS, get_final_answer_prompt, get_system_prompt
 
 load_dotenv()
 
@@ -26,13 +26,54 @@ GROQ_API_BASE = os.getenv("GROQ_API_BASE")
 if not GROQ_API_KEY:
     GROQ_API_KEY = None
 
+# ── Multi-key pool: loads GROQ_API_KEY, GROQ_API_KEY1, GROQ_API_KEY2, … ──────
+# On 429 rate-limit errors the client rotates to the next available key
+# immediately instead of waiting.
+def _load_api_key_pool() -> list[str]:
+    keys = []
+    # Primary key (no suffix)
+    k = os.getenv("GROQ_API_KEY", "").strip()
+    if k:
+        keys.append(k)
+    # Numbered fallbacks: GROQ_API_KEY1, GROQ_API_KEY2, …
+    for i in range(1, 20):
+        k = os.getenv(f"GROQ_API_KEY{i}", "").strip()
+        if k:
+            keys.append(k)
+        else:
+            break  # stop at first gap
+    return keys
 
-def build_client():
-    if GROQ_API_KEY and GROQ_API_BASE:
-        return Groq(api_key=GROQ_API_KEY, api_base=GROQ_API_BASE)
-    if GROQ_API_KEY:
-        return Groq(api_key=GROQ_API_KEY)
-    return None
+_API_KEY_POOL: list[str] = _load_api_key_pool()
+_current_key_index: int = 0
+
+
+def _get_current_key() -> str | None:
+    if not _API_KEY_POOL:
+        return None
+    return _API_KEY_POOL[_current_key_index % len(_API_KEY_POOL)]
+
+
+def _rotate_key() -> str | None:
+    global _current_key_index
+    if len(_API_KEY_POOL) <= 1:
+        return _get_current_key()
+    _current_key_index = (_current_key_index + 1) % len(_API_KEY_POOL)
+    new_key = _API_KEY_POOL[_current_key_index]
+    print(
+        f"[rate-limit] Rotated to API key #{_current_key_index + 1} / {len(_API_KEY_POOL)}",
+        file=sys.stderr, flush=True,
+    )
+    return new_key
+
+
+def build_client(api_key: str | None = None) -> "Groq | None":
+    key = api_key or _get_current_key()
+    if not key:
+        return None
+    if GROQ_API_BASE:
+        return Groq(api_key=key, base_url=GROQ_API_BASE)
+    return Groq(api_key=key)
 
 
 # ============================================================================
@@ -51,6 +92,9 @@ MODELS_WITHOUT_REASONING_EFFORT = {
     "llama-3.1-8b-instant",
     "gemma2-9b-it",
     "moonshotai/kimi-k2-instruct",
+    # Llama models produce broken XML tool-call format when reasoning_effort is set
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
 }
 
 
@@ -110,7 +154,7 @@ def looks_like_tool_output(text: str) -> bool:
 # Fast, cheap model used only for compressing tool results in the ReAct loop.
 # Needs to be in MODELS_WITHOUT_REASONING_EFFORT since we don't set that param.
 _SUMMARIZER_MODEL = "llama-3.1-8b-instant"
-_SUMMARIZER_TRUNCATE_FALLBACK = 2000  # chars — used if summarizer API call fails
+_SUMMARIZER_TRUNCATE_FALLBACK = 3500  # raised from 2000 — preserves apply links & stipends
 
 
 def summarize_tool_result(result: str, user_query: str, groq_client) -> str:
@@ -132,10 +176,13 @@ def summarize_tool_result(result: str, user_query: str, groq_client) -> str:
         "into a tight, factual summary.\n"
         "Rules:\n"
         "- Keep ONLY facts directly relevant to the user query.\n"
-        "- Preserve all specific numbers, scores, names, dates, and URLs.\n"
-        "- Drop navigation text, ads, repeated boilerplate, and off-topic content.\n"
-        "- Output plain text, 150-250 words maximum.\n"
-        "- Do NOT add any commentary, preamble, or closing remarks."
+        "- CRITICAL: ALWAYS preserve all URLs, apply links, and direct application links VERBATIM.\n"
+        "- CRITICAL: ALWAYS preserve stipend/salary amounts, company names, role titles, and posting dates.\n"
+        "- CRITICAL: ALWAYS preserve location information and eligibility/batch year details.\n"
+        "- Drop navigation text, ads, repeated boilerplate, cookie banners, and off-topic content.\n"
+        "- Output plain text, 200-350 words maximum.\n"
+        "- Do NOT add any commentary, preamble, or closing remarks.\n"
+        "- Do NOT summarize away or omit any apply link, stipend, or company detail."
     )
     user_prompt = (
         f"User query: {user_query}\n\n"
@@ -183,7 +230,7 @@ def build_final_answer_messages(user_text: str, executed_tools: list[dict], retr
         )
 
     messages = [
-        {"role": "system", "content": FINAL_ANSWER_SYSTEM_PROMPT},
+        {"role": "system", "content": get_final_answer_prompt(user_text)},
         {
             "role": "user",
             "content": "\n\n".join(
@@ -235,7 +282,7 @@ def build_tool_result_fallback(executed_tools: list[dict]) -> str:
 
 def stream_chat_with_tools(
     user_text: str,
-    model: str = "openai/gpt-oss-120b",
+    model: str = "openai/gpt-oss-20b",
     temperature: float = 0.0,
     max_completion_tokens: int = 2048,
     top_p: float = 0.9,
@@ -244,7 +291,7 @@ def stream_chat_with_tools(
     final_temperature: float = 0.0,
     reasoning_effort: str = DEFAULT_REASONING_EFFORT,
     final_reasoning_effort: str = DEFAULT_REASONING_EFFORT,
-    max_tool_calls: int = 6,
+    max_tool_calls: int = 3,
     max_final_answer_retries: int = 2,
 ):
     """
@@ -334,6 +381,7 @@ def stream_chat_with_tools(
         call_reasoning_effort: str | None = None,
         label: str = "groq",
     ):
+        nonlocal client  # allow key rotation to rebuild the Groq client on 429
         prompt_tokens = estimate_message_tokens(call_messages)
         desired_completion = max_completion_tokens
         total_requested = prompt_tokens + desired_completion
@@ -386,7 +434,9 @@ def stream_chat_with_tools(
 
         print(f"[{label}] [WAIT] Calling client.chat.completions.create()...", file=sys.stderr, flush=True)
         import re
-        max_api_retries = 3
+        # Each retry may use a different API key from the pool
+        max_api_retries = max(3, len(_API_KEY_POOL) + 1)
+        keys_tried: set[int] = set()
         for api_attempt in range(max_api_retries):
             try:
                 raw = client.chat.completions.with_raw_response.create(**request_kwargs)
@@ -406,13 +456,41 @@ def stream_chat_with_tools(
                     response = raw.parse()
                     break
                 elif "429" in error_text or "rate limit" in error_text.lower():
-                    if api_attempt < max_api_retries - 1:
+                    keys_tried.add(_current_key_index)
+                    if len(_API_KEY_POOL) > 1 and len(keys_tried) < len(_API_KEY_POOL):
+                        # Rotate to the next key and rebuild client immediately
+                        _rotate_key()
+                        client = build_client()
+                        print(
+                            f"[{label}] [WARN] Rate limit on key #{list(keys_tried)[-1]+1}. "
+                            f"Switched to key #{_current_key_index+1}. Retrying now...",
+                            file=sys.stderr, flush=True,
+                        )
+                    elif api_attempt < max_api_retries - 1:
+                        # Only one key available — fall back to timed wait
                         wait_match = re.search(r"try again in ([\d\.]+)s", error_text)
                         wait_s = float(wait_match.group(1)) + 1.0 if wait_match else 30.0
-                        print(f"[{label}] [WARN] Groq API Rate Limit hit. Waiting {wait_s:.1f}s before retry...", file=sys.stderr, flush=True)
+                        print(f"[{label}] [WARN] Rate limit hit (only 1 key). Waiting {wait_s:.1f}s...", file=sys.stderr, flush=True)
                         time.sleep(wait_s)
                     else:
-                        raise RuntimeError(f"Rate limit: unable to send request within timeout (API error: {error_text})")
+                        raise RuntimeError(f"Rate limit: all {len(_API_KEY_POOL)} key(s) exhausted. (API error: {error_text})")
+                elif "tool_use_failed" in error_text or "failed_generation" in error_text:
+                    # Llama models sometimes emit tool calls in a broken XML format
+                    # (<function=name {...}> instead of JSON). This is triggered by
+                    # reasoning_effort being set. Retry WITH tools but WITHOUT
+                    # reasoning_effort so the model produces valid JSON tool calls.
+                    print(
+                        f"[{label}] [WARN] Model produced broken tool-call format (XML-style). "
+                        "Retrying with tools but without reasoning_effort...",
+                        file=sys.stderr, flush=True,
+                    )
+                    recovery_kwargs = {k: v for k, v in request_kwargs.items()}
+                    recovery_kwargs.pop("reasoning_effort", None)
+                    # Mark this model so we never set reasoning_effort for it again
+                    MODELS_WITHOUT_REASONING_EFFORT.add(call_model)
+                    raw = client.chat.completions.with_raw_response.create(**recovery_kwargs)
+                    response = raw.parse()
+                    break
                 else:
                     raise
 
@@ -504,6 +582,10 @@ def stream_chat_with_tools(
     client = build_client()
     if client is None:
         raise RuntimeError("GROQ_API_KEY is not set in the environment")
+    print(
+        f"[init] API key pool: {len(_API_KEY_POOL)} key(s) available",
+        file=sys.stderr, flush=True,
+    )
 
     resolved_final_model = pick_final_model(model, final_model)
 
@@ -516,9 +598,8 @@ def stream_chat_with_tools(
 
     for attempt in range(retries + 1):
         try:
-            # Prepend current datetime as a system message so the LLM can
-            # evaluate whether search results are fresh or stale.
-            _date_ctx = get_system_prompt()
+            # Prepend current datetime and dynamic persona as a system message
+            _date_ctx = get_system_prompt(user_text)
             messages = [
                 {"role": "system", "content": _date_ctx},
                 {"role": "user", "content": user_text},
@@ -539,12 +620,17 @@ def stream_chat_with_tools(
             # This gives the agent true chain-of-thought: it can evaluate
             # result quality and iterate without human intervention.
             # ---------------------------------------------------------------
+            # FIRST call: force tool_choice="required" so the agent ALWAYS
+            # performs at least one real web search before answering.
+            # Subsequent rounds use "auto" so the model can decide when it
+            # has enough information.
+            # ---------------------------------------------------------------
             response = create_completion(
                 model,
                 messages,
                 temperature,
                 request_tools=TOOLS,
-                call_tool_choice="auto",
+                call_tool_choice="required",
                 call_reasoning_effort=reasoning_effort,
                 label="tool-phase",
             )
@@ -557,9 +643,12 @@ def stream_chat_with_tools(
                     if not choice.message.tool_calls:
                         # Model returned a plain-text reply — it decided it
                         # has sufficient information to answer the user.
+                        # NOTE: We do NOT stream this to stdout yet — if tools
+                        # were executed, the final-answer phase will synthesize
+                        # a proper answer from real search results.  We only
+                        # use this inline text when no tools ran at all.
                         content = extract_text_content(choice.message.content)
                         if content:
-                            print(content, end="", flush=True)
                             collected_output += content
                         continue
 
@@ -620,28 +709,13 @@ def stream_chat_with_tools(
                                 f"search_web with query: {query}",
                                 file=sys.stderr, flush=True,
                             )
+                            # Always create a fresh event loop in this background
+                            # thread — never use asyncio.get_event_loop() which may
+                            # return the uvicorn main-thread loop and raise
+                            # "This event loop is already running".
+                            _tool_loop = asyncio.new_event_loop()
                             try:
-                                loop = asyncio.get_event_loop()
-                                print(
-                                    f"[tool-call-{tool_call_count}] Using existing "
-                                    "event loop",
-                                    file=sys.stderr, flush=True,
-                                )
-                            except RuntimeError:
-                                print(
-                                    f"[tool-call-{tool_call_count}] Creating new event loop",
-                                    file=sys.stderr, flush=True,
-                                )
-                                loop = asyncio.new_event_loop()
-                                asyncio.set_event_loop(loop)
-
-                            print(
-                                f"[tool-call-{tool_call_count}] [WAIT] Running "
-                                "async search_web...",
-                                file=sys.stderr, flush=True,
-                            )
-                            try:
-                                tool_result = loop.run_until_complete(
+                                tool_result = _tool_loop.run_until_complete(
                                     search_web(query)
                                 )
                             except Exception as e:
@@ -653,6 +727,8 @@ def stream_chat_with_tools(
                                 import traceback
                                 traceback.print_exc(file=sys.stderr)
                                 tool_result = f"Error executing search: {str(e)}"
+                            finally:
+                                _tool_loop.close()
 
                             print(
                                 f"[tool-call-{tool_call_count}] [DONE] search_web "
@@ -661,7 +737,6 @@ def stream_chat_with_tools(
                             )
                         elif func_name == "navigate_url":
                             nav_url = func_args.get("url", "") or ""
-                            # Model may pass null for unset optional fields — coerce to ""
                             inp_text = func_args.get("input_text") or ""
                             inp_sel  = func_args.get("input_selector") or ""
                             clk_sel  = func_args.get("click_selector") or ""
@@ -670,13 +745,9 @@ def stream_chat_with_tools(
                                 f"navigate_url: {nav_url}",
                                 file=sys.stderr, flush=True,
                             )
+                            _nav_loop = asyncio.new_event_loop()
                             try:
-                                loop = asyncio.get_event_loop()
-                            except RuntimeError:
-                                loop = asyncio.new_event_loop()
-                                asyncio.set_event_loop(loop)
-                            try:
-                                tool_result = loop.run_until_complete(
+                                tool_result = _nav_loop.run_until_complete(
                                     navigate_url(
                                         url=nav_url,
                                         input_text=inp_text,
@@ -686,14 +757,15 @@ def stream_chat_with_tools(
                                 )
                             except Exception as e:
                                 tool_result = f"navigate_url failed: {e}"
+                            finally:
+                                _nav_loop.close()
                             print(
                                 f"[tool-call-{tool_call_count}] [DONE] navigate_url "
                                 f"returned {len(tool_result)} chars",
                                 file=sys.stderr, flush=True,
                             )
                         elif func_name in ("open_web", "browse_web", "web_search", "browser", "open_browser"):
-                            # The model hallucinated a tool from its training data
-                            # (e.g. gpt-oss-120b's built-in 'open_web').
+                            # The model hallucinated a tool from its training data.
                             # Redirect: extract URL or query and run search_web.
                             url_hint = (
                                 func_args.get("id")
@@ -706,17 +778,15 @@ def stream_chat_with_tools(
                                 f"'{func_name}' → search_web('{url_hint[:80]}')",
                                 file=sys.stderr, flush=True,
                             )
+                            _redir_loop = asyncio.new_event_loop()
                             try:
-                                loop = asyncio.get_event_loop()
-                            except RuntimeError:
-                                loop = asyncio.new_event_loop()
-                                asyncio.set_event_loop(loop)
-                            try:
-                                tool_result = loop.run_until_complete(
+                                tool_result = _redir_loop.run_until_complete(
                                     search_web(url_hint)
                                 )
                             except Exception as e:
                                 tool_result = f"Redirected search failed: {e}"
+                            finally:
+                                _redir_loop.close()
                         else:
                             tool_result = f"Unknown tool: {func_name}. Only 'search_web' is available."
 
@@ -748,13 +818,37 @@ def stream_chat_with_tools(
 
                 # ── Decide whether to continue the ReAct loop ────────────────
                 if not handled_tool_calls:
-                    # Model returned plain text — it answered directly
-                    print(
-                        f"[react-loop] Model answered directly on round {react_round} "
-                        "(no further tool calls needed)",
-                        file=sys.stderr, flush=True,
-                    )
-                    break
+                    # Model returned plain text — it decided it has enough info.
+                    # Only accept this if at least one tool call was already made;
+                    # otherwise the response is just training-data hallucination.
+                    if tool_call_count == 0:
+                        print(
+                            f"[react-loop] Model tried to answer without any tool calls. "
+                            "Forcing a search call now.",
+                            file=sys.stderr, flush=True,
+                        )
+                        messages.append({
+                            "role": "user",
+                            "content": "You have NOT performed any web searches yet. You MUST call search_web now before answering. Do not describe what you would search — call the tool immediately."
+                        })
+                        response = create_completion(
+                            model,
+                            messages,
+                            temperature,
+                            request_tools=TOOLS,
+                            call_tool_choice="required",
+                            call_reasoning_effort=reasoning_effort,
+                            label=f"react-{react_round}-forced",
+                        )
+                        continue
+                    else:
+                        # Model returned plain text after at least one search — accept it.
+                        print(
+                            f"[react-loop] Model answered directly on round {react_round} "
+                            "(no further tool calls needed)",
+                            file=sys.stderr, flush=True,
+                        )
+                        break
 
                 if tool_call_count >= max_tool_calls:
                     print(
@@ -784,9 +878,17 @@ def stream_chat_with_tools(
                 )
             # ── End ReAct loop ───────────────────────────────────────────────
 
-            # If the loop ended with tool calls (hit the limit), ask the
-            # final-answer model to synthesize everything we collected.
-            if executed_tools and not collected_output:
+            # If any tools were executed, ALWAYS synthesize the final answer
+            # from the actual search results — never use the inline "thinking"
+            # monologue the model may have produced in the ReAct loop.
+            if executed_tools:
+                # Discard any inline text collected during the ReAct loop;
+                # it is the model's reasoning stream, not the final answer.
+                collected_output = ""
+                print(
+                    f"[final-phase] [START] Synthesizing answer from {len(executed_tools)} tool result(s)...",
+                    file=sys.stderr, flush=True,
+                )
                 final_text = request_final_answer(executed_tools, resolved_final_model)
                 if final_text is None:
                     final_text = build_tool_result_fallback(executed_tools)
@@ -796,7 +898,7 @@ def stream_chat_with_tools(
                         file=sys.stderr, flush=True,
                     )
                 print(final_text, end="", flush=True)
-                collected_output += final_text
+                collected_output = final_text
 
             if not collected_output:
                 raise RuntimeError("Model returned no content and no tool calls")
@@ -867,7 +969,7 @@ def main():
     )
     parser.add_argument(
         "--model",
-        default="openai/gpt-oss-120b",
+        default="openai/gpt-oss-20b",
         help="Tool-calling model to use for phase 1.",
     )
     parser.add_argument(

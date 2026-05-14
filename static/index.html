@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-<link href="/static/style.css" rel="stylesheet"/>
+<link href="/static/style.css?v=2" rel="stylesheet"/>
 <script>
 tailwind.config = {
   theme: {
@@ -102,20 +102,22 @@ tailwind.config = {
       </div>
 
       <!-- Centre: absolutely centered search pill (desktop only) -->
-      <div class="hidden md:block absolute left-1/2 -translate-x-1/2" style="width:min(600px,48%)">
-        <div class="search-pill flex items-center gap-2 bg-white border border-slate-200 rounded-full px-5 py-2 shadow-sm focus-within:border-primary/40 focus-within:shadow-[0_0_0_3px_rgba(16,67,86,0.08)] transition-all">
-          <input id="task-input" class="flex-1 bg-transparent text-sm text-slate-700 outline-none min-w-0" placeholder='Describe your task — e.g. "Find IPL scores"' type="text" autocomplete="off"/>
-          <button id="btn-run-desktop" class="btn-run-ui bg-primary hover:bg-[#0d3848] text-white px-5 py-1.5 rounded-full font-semibold text-sm transition-colors shrink-0">Run</button>
-          <button id="btn-stop-desktop" class="btn-stop-ui hidden bg-red-500 hover:bg-red-600 text-white px-5 py-1.5 rounded-full font-semibold text-sm transition-colors shrink-0">Stop</button>
+      <div class="hidden md:block absolute left-1/2 -translate-x-1/2 top-[9px]" style="width:min(600px,48%)">
+        <div class="search-pill flex items-end gap-2 bg-white border border-slate-200 rounded-3xl px-5 py-2 shadow-sm focus-within:border-primary/40 focus-within:shadow-[0_0_0_3px_rgba(16,67,86,0.08)] transition-all">
+          <textarea id="task-input" class="flex-1 bg-transparent text-sm text-slate-700 outline-none min-w-0 resize-none py-1 custom-scroll" style="min-height: 28px; max-height: 96px; overflow-y: auto;" rows="1" placeholder='Describe your task — e.g. "Find IPL scores"' autocomplete="off"></textarea>
+          <button id="btn-run-desktop" class="btn-run-ui bg-primary hover:bg-[#0d3848] text-white px-5 py-1.5 rounded-full font-semibold text-sm transition-colors shrink-0 mb-0.5">Run</button>
+          <button id="btn-stop-desktop" class="btn-stop-ui hidden bg-red-500 hover:bg-red-600 text-white px-5 py-1.5 rounded-full font-semibold text-sm transition-colors shrink-0 mb-0.5">Stop</button>
         </div>
       </div>
 
       <!-- Right: model selector + status + mobile run -->
       <div class="flex items-center gap-2 shrink-0">
         <select id="setting-model" class="hidden md:block text-xs bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-600 focus:ring-1 focus:ring-primary h-8">
+          <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
           <option value="openai/gpt-oss-120b">GPT OSS 120B</option>
-          <option value="openai/gpt-oss-20b">GPT OSS 20B</option>
+          <option value="openai/gpt-oss-20b" selected>GPT OSS 20B (Default)</option>
           <option value="qwen/qwen3-32b">Qwen 3 32B</option>
+          <option value="llama-3.1-8b-instant">Llama 3.1 8B (Fast)</option>
         </select>
         <span id="status-chip-desktop" class="status-chip-ui hidden md:flex px-3 py-1 bg-slate-50 text-slate-500 rounded-full text-xs font-semibold items-center gap-1.5 border border-slate-200 transition-all">
           <span class="status-dot-ui w-1.5 h-1.5 rounded-full bg-slate-400 transition-colors"></span>
@@ -135,9 +137,9 @@ tailwind.config = {
 
     <!-- ── Row 2: full-width search bar (mobile only) ── -->
     <div class="md:hidden px-4 pb-3">
-      <div class="search-pill flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-2.5 shadow-sm focus-within:border-primary/40 focus-within:shadow-[0_0_0_3px_rgba(16,67,86,0.08)] transition-all">
-        <span class="material-symbols-outlined text-slate-400 text-[18px] shrink-0">search</span>
-        <input id="task-input-mobile" class="flex-1 bg-transparent text-sm text-slate-700 outline-none min-w-0" placeholder='Describe your task...' type="text" autocomplete="off"/>
+      <div class="search-pill flex items-end gap-2 bg-white border border-slate-200 rounded-3xl px-4 py-2.5 shadow-sm focus-within:border-primary/40 focus-within:shadow-[0_0_0_3px_rgba(16,67,86,0.08)] transition-all">
+        <span class="material-symbols-outlined text-slate-400 text-[18px] shrink-0 mb-1">search</span>
+        <textarea id="task-input-mobile" class="flex-1 bg-transparent text-sm text-slate-700 outline-none min-w-0 resize-none py-0.5 custom-scroll" style="min-height: 24px; max-height: 80px; overflow-y: auto;" rows="1" placeholder='Describe your task...' autocomplete="off"></textarea>
       </div>
     </div>
 
@@ -259,6 +261,6 @@ tailwind.config = {
   </footer>
 </div>
 
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=2"></script>
 </body>
 </html>

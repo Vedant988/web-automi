@@ -124,10 +124,12 @@ function resetAgent() {
   stepCount = 0;
   stepList.innerHTML = "";
   logBody.innerHTML = "";
+  resultBody.innerHTML = "";
   resultCard.classList.add("hidden");
   stepCountBadge.textContent = "0 Steps";
   stepBadge.classList.add("hidden");
   stepNum.textContent = "0";
+  window.streamedResult = "";  // ← reset streamed buffer so result event always renders
   // Clear timing displays
   const rt = document.getElementById("result-timing");
   const rl = document.getElementById("result-latency-label");
@@ -349,9 +351,16 @@ function runTask(prompt) {
           const elapsed = ((Date.now() - taskStartTime) / 1000).toFixed(1);
           setStatus("success", `Done in ${elapsed}s`);
           resultCard.classList.remove("hidden");
-          if (!window.streamedResult) {
-              resultBody.innerHTML = renderMarkdown(msg.data.result || "No result.");
+          // Always render the authoritative final answer from the server.
+          // This overwrites any partial streamed tokens with the complete result.
+          const finalText = (msg.data.result || "").trim();
+          if (finalText) {
+            resultBody.innerHTML = renderMarkdown(finalText);
+          } else if (!resultBody.innerHTML.trim()) {
+            resultBody.innerHTML = "<p style='color:#fca5a5;'>Agent completed but returned no answer.</p>";
           }
+          // Scroll result into view
+          resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
           // Populate timing badge in card header
           const rt = document.getElementById("result-timing");
           if (rt) {
@@ -457,6 +466,7 @@ async function viewTask(id) {
       setStatus(task.status === "completed" ? "success" : "failed", task.status === "completed" ? "Completed" : "Failed");
     }
     taskInput.value = task.prompt;
+    if (typeof autoResize === 'function') autoResize(taskInput);
   } catch {}
 }
 
@@ -502,21 +512,54 @@ function timeAgo(iso) {
 // ══════════════════════════════════════════════════════
 // EVENT LISTENERS
 // ══════════════════════════════════════════════════════
+function autoResize(el) {
+  if (!el) return;
+  el.style.height = "1px";
+  el.style.height = el.scrollHeight + "px";
+}
+
 btnRunDesktop.addEventListener("click", () => runTask(taskInput.value));
 btnStopDesktop.addEventListener("click", stopTask);
 btnRunMobile.addEventListener("click", () => runTask(taskInput.value || taskInputMobile.value));
 btnStopMobile.addEventListener("click", stopTask);
-taskInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runTask(taskInput.value); } });
+
+taskInput.addEventListener("keydown", e => { 
+  if (e.key === "Enter" && !e.shiftKey) { 
+    e.preventDefault(); 
+    runTask(taskInput.value); 
+  } 
+});
+taskInput.addEventListener("input", () => autoResize(taskInput));
 
 // Mobile search input — sync bidirectionally with desktop input
 const taskInputMobile = document.getElementById("task-input-mobile");
 if (taskInputMobile) {
-  taskInputMobile.addEventListener("input", () => { taskInput.value = taskInputMobile.value; });
-  taskInputMobile.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runTask(taskInputMobile.value); } });
-  taskInput.addEventListener("input", () => { taskInputMobile.value = taskInput.value; });
+  taskInputMobile.addEventListener("input", () => { 
+    taskInput.value = taskInputMobile.value; 
+    autoResize(taskInputMobile);
+    autoResize(taskInput);
+  });
+  taskInputMobile.addEventListener("keydown", e => { 
+    if (e.key === "Enter" && !e.shiftKey) { 
+      e.preventDefault(); 
+      runTask(taskInputMobile.value); 
+    } 
+  });
+  taskInput.addEventListener("input", () => { 
+    taskInputMobile.value = taskInput.value; 
+    autoResize(taskInputMobile);
+  });
 }
 
-document.querySelectorAll(".example-chip").forEach(c => c.addEventListener("click", () => { taskInput.value = c.dataset.prompt; if (taskInputMobile) taskInputMobile.value = c.dataset.prompt; runTask(c.dataset.prompt); }));
+document.querySelectorAll(".example-chip").forEach(c => c.addEventListener("click", () => { 
+  taskInput.value = c.dataset.prompt; 
+  if (taskInputMobile) {
+    taskInputMobile.value = c.dataset.prompt; 
+    autoResize(taskInputMobile);
+  }
+  autoResize(taskInput);
+  runTask(c.dataset.prompt); 
+}));
 
 btnLogout.addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST" });

@@ -112,7 +112,7 @@ def api_me(user: dict = Depends(get_current_user)):
 # ── REST endpoints ──────────────────────────────────────────────
 class RunTaskRequest(BaseModel):
     prompt: str
-    model: str = "openai/gpt-oss-120b"
+    model: str = "openai/gpt-oss-20b"
 
 @app.get("/api/tasks")
 def api_list_tasks(user: dict = Depends(get_current_user)):
@@ -154,7 +154,7 @@ async def ws_run(websocket: WebSocket):
 
         data = await websocket.receive_json()
         prompt = (data.get("prompt") or "").strip()
-        model = data.get("model", "openai/gpt-oss-120b")
+        model = data.get("model", "openai/gpt-oss-20b")
 
         if not prompt:
             await websocket.send_json({"type": "error", "data": {"error": "Empty prompt"}})
