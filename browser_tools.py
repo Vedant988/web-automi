@@ -162,6 +162,50 @@ def normalize_whitespace(text: str, limit: int | None = None) -> str:
     return cleaned
 
 
+async def extract_page_text(page, timeout_ms: int = 4000, limit: int = 6000) -> str:
+    """
+    Best-effort page text extraction that prefers fast paths and degrades
+    gracefully on dynamic sites instead of timing out the entire workflow.
+    """
+    try:
+        body_text = await page.locator("body").inner_text(timeout=timeout_ms)
+        normalized = normalize_whitespace(body_text, limit=limit)
+        if normalized:
+            return normalized
+    except Exception:
+        pass
+
+    try:
+        body_text = await page.evaluate(
+            """
+            () => {
+                const root = document.body || document.documentElement;
+                if (!root) return '';
+                return (root.innerText || root.textContent || '').trim();
+            }
+            """
+        )
+        normalized = normalize_whitespace(body_text, limit=limit)
+        if normalized:
+            return normalized
+    except Exception:
+        pass
+
+    try:
+        body_text = await page.evaluate(
+            """
+            () => Array.from(document.querySelectorAll('main, article, section, h1, h2, h3, p, li'))
+                .slice(0, 120)
+                .map(node => (node.innerText || node.textContent || '').trim())
+                .filter(Boolean)
+                .join('\\n')
+            """
+        )
+        return normalize_whitespace(body_text, limit=limit)
+    except Exception:
+        return ""
+
+
 def looks_like_blocked_page(title: str, body_text: str) -> bool:
     haystack = f"{title}\n{body_text}".lower()
     return any(signal in haystack for signal in BLOCKED_PAGE_SIGNALS)
@@ -540,7 +584,7 @@ async def extract_search_results(page, selectors: dict, limit: int = 5) -> list[
     return normalized
 
 
-async def visit_result_pages(context, results: list[dict], per_page_timeout_ms: int = 30000) -> list[dict]:
+async def visit_result_pages(context, results: list[dict], per_page_timeout_ms: int = 12000) -> list[dict]:
     """
     Visit the top result pages and return an excerpt from each.
 
@@ -567,9 +611,9 @@ async def visit_result_pages(context, results: list[dict], per_page_timeout_ms: 
         try:
             await _apply_stealth(page)
             await page.goto(url, timeout=per_page_timeout_ms, wait_until="domcontentloaded")
+            await page.wait_for_timeout(800)
             title = (await page.title()).strip() or result["title"]
-            body_text = await page.locator("body").inner_text(timeout=10000)
-            excerpt = normalize_whitespace(body_text, limit=600)
+            excerpt = await extract_page_text(page, timeout_ms=2500, limit=600)
 
             # ------------------------------------------------------------------
             # Snippet fallback: if the page looks blocked, use the SERP snippet
@@ -807,12 +851,7 @@ async def search_web(query: str, timeout: int = 90) -> str:
                         except Exception:
                             title = ""
                             
-                        try:
-                            body_text = await page.locator("body").inner_text(timeout=5000)
-                        except Exception:
-                            body_text = ""
-
-                        normalized_body = normalize_whitespace(body_text, limit=5000)
+                        normalized_body = await extract_page_text(page, timeout_ms=2500, limit=5000)
                         if looks_like_blocked_page(title, normalized_body):
                             notes.append(f"{engine['name']}: blocked or anti-bot page detected")
                             print(
@@ -1014,13 +1053,7 @@ async def navigate_url(
                         pass
 
                     title = (await page.title()).strip()
-                    body_text = ""
-                    try:
-                        body_text = await page.locator("body").inner_text(timeout=10000)
-                    except Exception:
-                        pass
-
-                    page_content = normalize_whitespace(body_text, limit=6000)
+                    page_content = await extract_page_text(page, timeout_ms=3000, limit=6000)
 
                     if looks_like_blocked_page(title, page_content):
                         result = (
@@ -1045,16 +1078,12 @@ async def navigate_url(
     except asyncio.TimeoutError:
         print(f"[navigate_url] [TIMEOUT] navigate_url exceeded {timeout}s", file=sys.stderr, flush=True)
         force_kill_browser()
-        return f"Timeout: navigate_url exceeded {timeout}s"
+        return (
+            f"Timeout: navigate_url exceeded {timeout}s while loading {url}. "
+            "The page is likely highly dynamic or anti-bot protected."
+        )
     except Exception as exc:
         import traceback
         traceback.print_exc(file=sys.stderr)
         return f"Error navigating to {url}: {exc}"
-
-
-# ============================================================================
-# Tool Calling with Groq
-# ============================================================================
-
-from prompts import TOOLS, FINAL_ANSWER_SYSTEM_PROMPT, get_system_prompt
 
