@@ -130,6 +130,8 @@ MODELS_WITHOUT_REASONING_EFFORT = {
     "llama-3.1-8b-instant",
     "gemma2-9b-it",
     "moonshotai/kimi-k2-instruct",
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
     # Llama models produce broken XML tool-call format when reasoning_effort is set
     "meta-llama/llama-4-scout-17b-16e-instruct",
     "meta-llama/llama-4-maverick-17b-128e-instruct",
@@ -524,7 +526,22 @@ def stream_chat_with_tools(
                     )
                     recovery_kwargs = {k: v for k, v in request_kwargs.items()}
                     recovery_kwargs.pop("reasoning_effort", None)
+                    if recovery_kwargs.get("tool_choice") == "required":
+                        recovery_kwargs["tool_choice"] = "auto"
                     # Mark this model so we never set reasoning_effort for it again
+                    MODELS_WITHOUT_REASONING_EFFORT.add(call_model)
+                    raw = client.chat.completions.with_raw_response.create(**recovery_kwargs)
+                    response = raw.parse()
+                    break
+                elif "Tool choice is required, but model did not call a tool" in error_text:
+                    print(
+                        f"[{label}] [WARN] Model skipped a required tool call. "
+                        "Retrying with tool_choice=auto...",
+                        file=sys.stderr, flush=True,
+                    )
+                    recovery_kwargs = {k: v for k, v in request_kwargs.items()}
+                    recovery_kwargs["tool_choice"] = "auto"
+                    recovery_kwargs.pop("reasoning_effort", None)
                     MODELS_WITHOUT_REASONING_EFFORT.add(call_model)
                     raw = client.chat.completions.with_raw_response.create(**recovery_kwargs)
                     response = raw.parse()
@@ -658,17 +675,17 @@ def stream_chat_with_tools(
             # This gives the agent true chain-of-thought: it can evaluate
             # result quality and iterate without human intervention.
             # ---------------------------------------------------------------
-            # FIRST call: force tool_choice="required" so the agent ALWAYS
-            # performs at least one real web search before answering.
-            # Subsequent rounds use "auto" so the model can decide when it
-            # has enough information.
+            # FIRST call: start with tool_choice="auto". Some models, notably
+            # gpt-oss variants, can fail hard when "required" is set and they
+            # miss the exact tool-call format. We still enforce real browsing
+            # below if the model tries to answer without any tool usage.
             # ---------------------------------------------------------------
             response = create_completion(
                 model,
                 messages,
                 temperature,
                 request_tools=TOOLS,
-                call_tool_choice="required",
+                call_tool_choice="auto",
                 call_reasoning_effort=reasoning_effort,
                 label="tool-phase",
             )
@@ -874,7 +891,7 @@ def stream_chat_with_tools(
                             messages,
                             temperature,
                             request_tools=TOOLS,
-                            call_tool_choice="required",
+                            call_tool_choice="auto",
                             call_reasoning_effort=reasoning_effort,
                             label=f"react-{react_round}-forced",
                         )
