@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from groq import Groq
 from collections import deque
 from urllib.parse import parse_qs, quote_plus, unquote, urlparse
-from prompts import TOOLS, get_final_answer_prompt, get_system_prompt
+import prompts as prompts_module
 
 load_dotenv()
 
@@ -25,6 +25,44 @@ GROQ_API_BASE = os.getenv("GROQ_API_BASE")
 
 if not GROQ_API_KEY:
     GROQ_API_KEY = None
+
+
+TOOLS = prompts_module.TOOLS
+
+
+def get_system_prompt(user_text: str = "") -> str:
+    """
+    Support both prompt module variants:
+    - newer shape: get_system_prompt(user_text="")
+    - older shape: get_system_prompt()
+    """
+    prompt_builder = getattr(prompts_module, "get_system_prompt", None)
+    if prompt_builder is None:
+        raise RuntimeError("prompts.py is missing get_system_prompt")
+
+    try:
+        return prompt_builder(user_text)
+    except TypeError:
+        return prompt_builder()
+
+
+def get_final_answer_prompt(user_text: str = "") -> str:
+    """
+    Support both prompt module variants:
+    - newer shape: get_final_answer_prompt(user_text="")
+    - older shape: FINAL_ANSWER_SYSTEM_PROMPT constant
+    """
+    prompt_builder = getattr(prompts_module, "get_final_answer_prompt", None)
+    if callable(prompt_builder):
+        return prompt_builder(user_text)
+
+    fallback_prompt = getattr(prompts_module, "FINAL_ANSWER_SYSTEM_PROMPT", None)
+    if isinstance(fallback_prompt, str) and fallback_prompt.strip():
+        return fallback_prompt
+
+    raise RuntimeError(
+        "prompts.py must define either get_final_answer_prompt() or FINAL_ANSWER_SYSTEM_PROMPT"
+    )
 
 # ── Multi-key pool: loads GROQ_API_KEY, GROQ_API_KEY1, GROQ_API_KEY2, … ──────
 # On 429 rate-limit errors the client rotates to the next available key
