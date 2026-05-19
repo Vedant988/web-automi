@@ -9,6 +9,10 @@ services:
         value: 10000
       - key: GROQ_API_KEY
         sync: false
+      - key: HEADLESS
+        value: "1"
+      - key: REUSE_BROWSER
+        value: "0"
     disk:
       name: sqlite-data
       mountPath: /app/data

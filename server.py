@@ -29,29 +29,48 @@ runner = AgentRunner()
 global_playwright = None
 global_browser = None
 
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
 @asynccontextmanager
 async def lifespan(app):
     init_db()
     print("[server] Database initialized — http://localhost:8000")
     
-    # Launch persistent browser for context reuse
-    try:
-        from playwright.async_api import async_playwright
-        global global_playwright, global_browser
-        global_playwright = await async_playwright().start()
-        global_browser = await global_playwright.chromium.launch(
-            headless=False,
-            args=[
-                "--remote-debugging-port=9222",
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu"
-            ]
-        )
-        print("[server] Global Chromium launched on port 9222 for context reuse")
-    except Exception as e:
-        print(f"[server] Warning: Could not launch global Chromium: {e}")
+    reuse_browser = _env_flag("REUSE_BROWSER", default=True)
+    headless = _env_flag("HEADLESS", default=False)
+
+    # Render-sized instances are memory-constrained, so keep Chromium
+    # on-demand unless browser reuse is explicitly enabled.
+    if reuse_browser:
+        try:
+            from playwright.async_api import async_playwright
+            global global_playwright, global_browser
+            global_playwright = await async_playwright().start()
+            global_browser = await global_playwright.chromium.launch(
+                headless=headless,
+                args=[
+                    "--remote-debugging-port=9222",
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--disable-extensions",
+                    "--disable-background-networking",
+                    "--disable-default-apps",
+                    "--mute-audio",
+                    "--window-size=1280,720"
+                ]
+            )
+            print(f"[server] Global Chromium launched on port 9222 (headless={headless})")
+        except Exception as e:
+            print(f"[server] Warning: Could not launch global Chromium: {e}")
+    else:
+        print("[server] Global browser reuse disabled; Chromium will launch on demand")
         
     yield
 
