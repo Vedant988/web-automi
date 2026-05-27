@@ -751,7 +751,7 @@ async def get_browser_and_page(p, is_search=False):
     try:
         browser = await p.chromium.connect_over_cdp("http://localhost:9222")
         print("[browser-use] Connected to existing Chrome instance on port 9222", file=sys.stderr, flush=True)
-        context = browser.contexts[0] if browser.contexts else await browser.new_context()
+        context = await browser.new_context()
         page = await context.new_page()
         await page.set_extra_http_headers(extra_headers)
         return browser, context, page, True
@@ -852,7 +852,7 @@ async def cleanup_browser(browser_or_none, context, page, is_remote):
         pass
     try:
         if is_remote:
-            if context and browser_or_none and len(browser_or_none.contexts) > 1:
+            if context:
                 await context.close()
         else:
             if context:

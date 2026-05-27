@@ -397,17 +397,18 @@ def stream_chat_with_tools(
         "rl_reset_tokens": None,
     }
 
-    def estimate_tokens(text: str) -> int:
+    def estimate_tokens(text: str, is_json: bool = False) -> int:
         if not text:
             return 1
-        return max(1, int(len(text) / 4))
+        factor = 2.5 if is_json else 3.0
+        return max(1, int(len(text) / factor))
 
     def estimate_message_tokens(chat_messages) -> int:
         total = 0
         for message in chat_messages:
-            total += estimate_tokens(extract_text_content(message.get("content", "")))
+            total += estimate_tokens(extract_text_content(message.get("content", "")), is_json=False)
             if "tool_calls" in message:
-                total += estimate_tokens(json.dumps(message["tool_calls"]))
+                total += estimate_tokens(json.dumps(message["tool_calls"]), is_json=True)
             if "name" in message:
                 total += estimate_tokens(message["name"])
         return max(1, total)
@@ -423,19 +424,45 @@ def stream_chat_with_tools(
         label: str = "groq",
     ):
         nonlocal client  # allow key rotation to rebuild the Groq client on 429
+        tpm_safety_margin = 800
+        safe_tpm_limit = TPM_LIMIT - tpm_safety_margin
+
         prompt_tokens = estimate_message_tokens(call_messages)
+        
+        # Self-healing: if the prompt alone is too large, prune older tool contents in-place
+        if prompt_tokens >= safe_tpm_limit - 50:
+            print(
+                f"[rate-limit] Prompt size {prompt_tokens} is close to safe limit {safe_tpm_limit}. "
+                "Pruning older tool results to reclaim token budget...",
+                file=sys.stderr, flush=True
+            )
+            # Prune oldest tool results first
+            for msg in call_messages:
+                if msg.get("role") == "tool" and msg.get("content"):
+                    content = msg["content"]
+                    if len(content) > 600:
+                        msg["content"] = content[:500] + "\n...[truncated to fit rate limit]"
+                        prompt_tokens = estimate_message_tokens(call_messages)
+                        if prompt_tokens < safe_tpm_limit - 150:
+                            break
+                            
+            # If still too large, prune more aggressively
+            if prompt_tokens >= safe_tpm_limit - 50:
+                for msg in call_messages:
+                    if msg.get("role") == "tool" and msg.get("content"):
+                        msg["content"] = "[highly compressed to fit rate limit]"
+                prompt_tokens = estimate_message_tokens(call_messages)
+
         desired_completion = max_completion_tokens
         total_requested = prompt_tokens + desired_completion
 
-        if total_requested > TPM_LIMIT:
-            if prompt_tokens >= TPM_LIMIT - 10:
-                raise RuntimeError("Prompt too large to fit token limit")
-            desired_completion = max(1, TPM_LIMIT - prompt_tokens - 10)
+        if total_requested > safe_tpm_limit:
+            desired_completion = max(100, safe_tpm_limit - prompt_tokens)
             total_requested = prompt_tokens + desired_completion
             print(
-                f"[rate-limit] Adjusted completion tokens to {desired_completion} for {label}",
-                file=sys.stderr,
-                flush=True,
+                f"[rate-limit] Adjusted completion tokens to {desired_completion} for {label} "
+                f"to stay within safe TPM limit ({safe_tpm_limit})",
+                file=sys.stderr, flush=True
             )
 
         if desired_completion <= 0:
@@ -493,9 +520,7 @@ def stream_chat_with_tools(
                         file=sys.stderr,
                         flush=True,
                     )
-                    raw = client.chat.completions.with_raw_response.create(**request_kwargs)
-                    response = raw.parse()
-                    break
+                    continue
                 elif "429" in error_text or "rate limit" in error_text.lower():
                     keys_tried.add(_current_key_index)
                     if len(_API_KEY_POOL) > 1 and len(keys_tried) < len(_API_KEY_POOL):
@@ -525,28 +550,22 @@ def stream_chat_with_tools(
                         "Retrying with tools but without reasoning_effort...",
                         file=sys.stderr, flush=True,
                     )
-                    recovery_kwargs = {k: v for k, v in request_kwargs.items()}
-                    recovery_kwargs.pop("reasoning_effort", None)
-                    if recovery_kwargs.get("tool_choice") == "required":
-                        recovery_kwargs["tool_choice"] = "auto"
+                    request_kwargs.pop("reasoning_effort", None)
+                    if request_kwargs.get("tool_choice") == "required":
+                        request_kwargs["tool_choice"] = "auto"
                     # Mark this model so we never set reasoning_effort for it again
                     MODELS_WITHOUT_REASONING_EFFORT.add(call_model)
-                    raw = client.chat.completions.with_raw_response.create(**recovery_kwargs)
-                    response = raw.parse()
-                    break
+                    continue
                 elif "Tool choice is required, but model did not call a tool" in error_text:
                     print(
                         f"[{label}] [WARN] Model skipped a required tool call. "
                         "Retrying with tool_choice=auto...",
                         file=sys.stderr, flush=True,
                     )
-                    recovery_kwargs = {k: v for k, v in request_kwargs.items()}
-                    recovery_kwargs["tool_choice"] = "auto"
-                    recovery_kwargs.pop("reasoning_effort", None)
+                    request_kwargs["tool_choice"] = "auto"
+                    request_kwargs.pop("reasoning_effort", None)
                     MODELS_WITHOUT_REASONING_EFFORT.add(call_model)
-                    raw = client.chat.completions.with_raw_response.create(**recovery_kwargs)
-                    response = raw.parse()
-                    break
+                    continue
                 else:
                     raise
 

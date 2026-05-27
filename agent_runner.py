@@ -224,9 +224,6 @@ class AgentRunner:
 
             result = stream_chat_with_tools(prompt, model=model, final_model=final_model)
 
-            sys.stderr = original_stderr
-            sys.stdout = original_stdout
-
             self.result = (result or "").strip() or stdout_capture.getvalue().strip()
             self.status = "completed"
 
@@ -234,15 +231,16 @@ class AgentRunner:
             self.event_queue.put(AgentStep(
                 capture.step_count + 1, "done", "success", "Task complete", "", now
             ))
-        except Exception as exc:
-            sys.stderr = original_stderr
-            sys.stdout = original_stdout
+        except BaseException as exc:
             self.status = "failed"
             self.result = f"Error: {exc}"
             now = datetime.now(timezone.utc).isoformat()
             self.event_queue.put(AgentStep(
                 capture.step_count + 1, "error", "failed", "Task failed", str(exc), now
             ))
+        finally:
+            sys.stderr = original_stderr
+            sys.stdout = original_stdout
 
     def get_events(self):
         """Generator yielding step events. Yields None as heartbeat."""
