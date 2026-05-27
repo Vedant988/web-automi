@@ -50,36 +50,21 @@ async def ws_run(websocket: WebSocket):
         # Create task and launch thread
         task = db.create_task(prompt, user_id=user["id"], model=model)
         task_id = task["id"]
-        runner.start(prompt, model=model)
+        runner.start(prompt, model=model, task_id=task_id)
         await websocket.send_json({"type": "started", "data": {"task_id": task_id}})
 
         while True:
             try:
                 step = runner.event_queue.get_nowait()
-                try:
-                    db.add_step(
-                        task_id,
-                        step.step_number,
-                        step.type,
-                        step.status,
-                        step.title,
-                        step.detail,
-                        step.browser_url
-                    )
-                except Exception:
-                    pass
-
                 await websocket.send_json({"type": "step", "data": step.to_dict()})
 
                 if step.type == "done":
-                    db.update_task(task_id, "completed", runner.result)
                     await websocket.send_json({
                         "type": "result",
                         "data": {"task_id": task_id, "result": runner.result}
                     })
                     break
                 elif step.type == "error" and step.status == "failed":
-                    db.update_task(task_id, "failed", runner.result)
                     await websocket.send_json({
                         "type": "result",
                         "data": {"task_id": task_id, "result": runner.result, "error": True}
@@ -87,12 +72,6 @@ async def ws_run(websocket: WebSocket):
                     break
             except queue_module.Empty:
                 if not runner.is_running:
-                    if runner.result:
-                        db.update_task(task_id, runner.status, runner.result)
-                        await websocket.send_json({
-                            "type": "result",
-                            "data": {"task_id": task_id, "result": runner.result}
-                        })
                     break
                 await asyncio.sleep(0.25)
 
