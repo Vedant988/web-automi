@@ -70,8 +70,10 @@ class StderrCapture(io.TextIOBase):
                                 step.detail,
                                 step.browser_url
                             )
-                        except Exception:
-                            pass
+                        except Exception as err:
+                            if self.original_stderr:
+                                self.original_stderr.write(f"[db-error] StderrCapture database sync failed: {err}\n")
+                                self.original_stderr.flush()
         return len(text)
 
     def flush(self):
@@ -205,8 +207,10 @@ class StdoutCapture(io.StringIO):
                         step.detail,
                         step.browser_url
                     )
-                except Exception:
-                    pass
+                except Exception as err:
+                    if self.original_stdout:
+                        self.original_stdout.write(f"[db-error] StdoutCapture database sync failed: {err}\n")
+                        self.original_stdout.flush()
         if self.original_stdout:
             self.original_stdout.write(s)
             self.original_stdout.flush()
@@ -267,8 +271,9 @@ class ModularAgentRunner:
                     step.browser_url
                 )
                 db.update_task(self.task_id, "failed", "Stopped by user")
-            except Exception:
-                pass
+            except Exception as err:
+                sys.stderr.write(f"[db-error] stop() database sync failed: {err}\n")
+                sys.stderr.flush()
         # Direct active browser termination to force break thread hangs instantly
         force_kill_browser()
 
@@ -316,8 +321,9 @@ class ModularAgentRunner:
                         done_step.browser_url
                     )
                     db.update_task(task_id, "completed", self.result)
-                except Exception:
-                    pass
+                except Exception as err:
+                    original_stderr.write(f"[db-error] _run() success database sync failed: {err}\n")
+                    original_stderr.flush()
         except BaseException as exc:
             self.status = "failed"
             self.result = f"Error: {exc}"
@@ -339,8 +345,9 @@ class ModularAgentRunner:
                         err_step.browser_url
                     )
                     db.update_task(task_id, "failed", self.result)
-                except Exception:
-                    pass
+                except Exception as err:
+                    original_stderr.write(f"[db-error] _run() failure database sync failed: {err}\n")
+                    original_stderr.flush()
         finally:
             sys.stderr = original_stderr
             sys.stdout = original_stdout

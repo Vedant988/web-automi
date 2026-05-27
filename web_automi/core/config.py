@@ -13,15 +13,18 @@ from groq import Groq
 load_dotenv()
 
 # --- Database Path Resolution ---
-if os.path.exists("/app/data"):
-    # Render persistent disk
+if os.path.exists("/app/data") or os.getenv("RENDER") == "true":
+    # Render persistent disk or container environment
+    try:
+        os.makedirs("/app/data", exist_ok=True)
+    except Exception:
+        pass
     DB_PATH = "/app/data/chats.db"
-elif os.access(".", os.W_OK):
-    # Local development
-    DB_PATH = "chats.db"
 else:
-    # Serverless fallback
-    DB_PATH = "/tmp/chats.db"
+    # Use absolute path based on the project root folder for local development to prevent absolute path trap
+    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    DB_PATH = os.path.join(PROJECT_ROOT, "chats.db")
+
 
 
 # --- LLM Service Parameters ---
