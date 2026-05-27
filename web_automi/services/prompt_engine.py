@@ -159,10 +159,18 @@ class PromptEngine(IPromptEngine):
                 "Since the user is asking for a comparison, structure your response using clear bullet points or a markdown table.\n"
                 "Ensure you highlight the key differences, pros, and cons clearly.\n"
             )
+        elif any(kw in query_lower for kw in ["leaderboard", "standing", "ranking", "table", "statistic", "score", "tournament"]):
+            base_prompt += (
+                "If the synthesized information contains rankings, leaderboards, standings, tournament scores, or statistics, "
+                "you MUST format the primary data as a Markdown table. Do not use bullet points for tabular data.\n"
+                "Ensure that columns (e.g., Rank/Position, Player/Team Name, Points, etc.) are clearly laid out.\n"
+            )
         else:
             base_prompt += (
                 "For this query, return a clear, factual, well-structured plain-text answer.\n"
-                "Use bullet points if listing multiple items.\n"
+                "If the synthesized information contains rankings, leaderboards, standings, tournament scores, or statistics, "
+                "you MUST format the primary data as a Markdown table. Do not use bullet points for tabular data.\n"
+                "Use bullet points if listing multiple items that are not tabular.\n"
                 "If tool results are incomplete, say what is known and what could not be verified.\n"
             )
 
