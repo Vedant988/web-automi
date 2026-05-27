@@ -455,4 +455,5 @@ class PlaywrightBrowserService(IBrowserService):
             gc.collect()
             return result
         except Exception as err:
-            raise BrowserError(f"URL navigation failed for {url}: {err}")
+            # Fail gracefully instead of crashing the entire agent pipeline
+            return f"{{'error': 'Navigation timed out or failed for {url}. The site might have anti-bot protection. Please try a different source. Error details: {err}'}}"
