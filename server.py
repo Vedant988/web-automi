@@ -58,12 +58,33 @@ async def lifespan(app):
                     "--disable-blink-features=AutomationControlled",
                     "--no-sandbox",
                     "--disable-dev-shm-usage",
-                    "--disable-gpu",
+                    "--disable-infobars",
+                    "--disable-popup-blocking",
+                    "--window-size=1280,720",
                     "--disable-extensions",
+                    "--disable-gpu",
+                    "--disable-software-rasterizer",
+                    "--disable-gpu-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--js-flags=--max-old-space-size=256",  # limit V8 heap size to 256MB
                     "--disable-background-networking",
+                    "--disable-background-timer-throttling",
+                    "--disable-backgrounding-occluded-windows",
+                    "--disable-breakpad",
+                    "--disable-client-side-phishing-detection",
+                    "--disable-component-update",
                     "--disable-default-apps",
+                    "--disable-domain-reliability",
+                    "--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process",
+                    "--disable-ipc-flooding-protection",
+                    "--disable-print-preview",
+                    "--disable-prompt-on-repost",
+                    "--disable-renderer-backgrounding",
+                    "--disable-sync",
                     "--mute-audio",
-                    "--window-size=1280,720"
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--metrics-recording-only"
                 ]
             )
             print(f"[server] Global Chromium launched on port 9222 (headless={headless})")

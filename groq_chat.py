@@ -1,5 +1,6 @@
 import os
 import sys
+import gc
 import time
 import json
 import base64
@@ -331,7 +332,7 @@ def stream_chat_with_tools(
     final_temperature: float = 0.0,
     reasoning_effort: str = DEFAULT_REASONING_EFFORT,
     final_reasoning_effort: str = DEFAULT_REASONING_EFFORT,
-    max_tool_calls: int = 3,
+    max_tool_calls: int = 6,
     max_final_answer_retries: int = 2,
 ):
     """
@@ -463,8 +464,8 @@ def stream_chat_with_tools(
         }
         if request_tools is not None:
             request_kwargs["tools"] = request_tools
-        if call_tool_choice is not None:
-            request_kwargs["tool_choice"] = call_tool_choice
+            if call_tool_choice is not None:
+                request_kwargs["tool_choice"] = call_tool_choice
         supports_reasoning_effort = (
             call_reasoning_effort is not None
             and call_model not in MODELS_WITHOUT_REASONING_EFFORT
@@ -592,7 +593,7 @@ def stream_chat_with_tools(
                 resolved_final_model,
                 final_messages,
                 final_temperature,
-                call_tool_choice="none",
+                call_tool_choice=None,
                 call_reasoning_effort=final_reasoning_effort,
                 label="final-phase",
             )
@@ -991,6 +992,7 @@ def stream_chat_with_tools(
                 )
             print(f"[usage] {sep}", file=sys.stderr, flush=True)
 
+            gc.collect()
             return collected_output
 
         except KeyboardInterrupt:

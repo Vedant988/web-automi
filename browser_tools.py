@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import gc
 import json
 import time
 import asyncio
@@ -153,6 +154,46 @@ SELECTED_CHROME_PROFILE = None
 
 # Vision model used by the Set-of-Mark visual navigation agent.
 VLM_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
+
+async def setup_memory_saving_routes(page) -> None:
+    """
+    Abort requests for heavy assets (images, media, fonts) and common tracker/advertising domains
+    to minimize the Chromium memory footprint in 512MB RAM environments.
+    """
+    tracker_keywords = (
+        "google-analytics", "doubleclick", "adsystem", "adsense", 
+        "analytics", "tracker", "facebook.net", "facebook.com/tr", 
+        "pixel", "hotjar", "mixpanel", "amplitude", "segment.io"
+    )
+    
+    async def route_handler(route):
+        try:
+            req = route.request
+            res_type = req.resource_type
+            url = req.url.lower()
+            
+            # Block heavy resource types
+            if res_type in ("image", "media", "font"):
+                await route.abort()
+                return
+                
+            # Block tracking, advertising, and analytics scripts
+            if any(kw in url for kw in tracker_keywords):
+                await route.abort()
+                return
+                
+            await route.continue_()
+        except Exception:
+            try:
+                await route.continue_()
+            except Exception:
+                pass
+            
+    try:
+        await page.route("**/*", route_handler)
+    except Exception as exc:
+        print(f"[browser-use] [WARN] Failed to setup memory routing: {exc}", file=sys.stderr, flush=True)
 
 
 def normalize_whitespace(text: str, limit: int | None = None) -> str:
@@ -584,7 +625,7 @@ async def extract_search_results(page, selectors: dict, limit: int = 5) -> list[
     return normalized
 
 
-async def visit_result_pages(context, results: list[dict], per_page_timeout_ms: int = 12000) -> list[dict]:
+async def visit_result_pages(context, results: list[dict], per_page_timeout_ms: int = 30000) -> list[dict]:
     """
     Visit the top result pages and return an excerpt from each.
 
@@ -727,8 +768,31 @@ async def get_browser_and_page(p, is_search=False):
             "--disable-dev-shm-usage",
             "--disable-infobars",
             "--disable-popup-blocking",
-            "--window-size=1920,1080",
+            "--window-size=1280,720",
             "--disable-extensions",
+            "--disable-gpu",
+            "--disable-software-rasterizer",
+            "--disable-gpu-sandbox",
+            "--disable-setuid-sandbox",
+            "--js-flags=--max-old-space-size=256",  # limit V8 heap size to 256MB
+            "--disable-background-networking",
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-breakpad",
+            "--disable-client-side-phishing-detection",
+            "--disable-component-update",
+            "--disable-default-apps",
+            "--disable-domain-reliability",
+            "--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process",
+            "--disable-ipc-flooding-protection",
+            "--disable-print-preview",
+            "--disable-prompt-on-repost",
+            "--disable-renderer-backgrounding",
+            "--disable-sync",
+            "--mute-audio",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--metrics-recording-only",
         ]
 
         try:
@@ -743,7 +807,7 @@ async def get_browser_and_page(p, is_search=False):
                     "channel": "chrome",
                     "user_agent": SEARCH_USER_AGENT,
                     "locale": "en-US",
-                    "viewport": {"width": 1440, "height": 960},
+                    "viewport": {"width": 1280, "height": 720},
                     "args": args
                 }
                 if extra_headers:
@@ -763,7 +827,7 @@ async def get_browser_and_page(p, is_search=False):
                 context_kwargs = {
                     "user_agent": SEARCH_USER_AGENT,
                     "locale": "en-US",
-                    "viewport": {"width": 1440, "height": 960}
+                    "viewport": {"width": 1280, "height": 720}
                 }
                 if extra_headers:
                     context_kwargs["extra_http_headers"] = extra_headers
@@ -782,11 +846,19 @@ async def get_browser_and_page(p, is_search=False):
 
 async def cleanup_browser(browser_or_none, context, page, is_remote):
     try:
-        await page.close()
-        if not is_remote:
-            await context.close()
-        elif browser_or_none:
-            await browser_or_none.close()
+        if page:
+            await page.close()
+    except Exception:
+        pass
+    try:
+        if is_remote:
+            if context and browser_or_none and len(browser_or_none.contexts) > 1:
+                await context.close()
+        else:
+            if context:
+                await context.close()
+            if browser_or_none:
+                await browser_or_none.close()
     except Exception:
         pass
 
@@ -804,6 +876,7 @@ async def search_web(query: str, timeout: int = 90) -> str:
         async def search_with_browser():
             async with async_playwright() as p:
                 browser_or_none, context, page, is_remote = await get_browser_and_page(p, is_search=True)
+                await setup_memory_saving_routes(page)
                 
                 try:
                     # Mask navigator.webdriver at the JS level (belt + suspenders with stealth)
@@ -941,6 +1014,7 @@ async def search_web(query: str, timeout: int = 90) -> str:
         print(f"[browser-use] [START] Running async browser search (timeout={timeout}s)...", file=sys.stderr, flush=True)
         result = await asyncio.wait_for(search_with_browser(), timeout=timeout)
         print(f"[browser-use] [DONE] Search completed", file=sys.stderr, flush=True)
+        gc.collect()
         return result
         
     except asyncio.TimeoutError:
@@ -962,7 +1036,7 @@ async def navigate_url(
     input_text: str = "",
     input_selector: str = "",
     click_selector: str = "",
-    timeout: int = 30,
+    timeout: int = 60,
 ) -> str:
     """
     Navigate to any URL with Playwright and return the page text content.
@@ -980,6 +1054,7 @@ async def navigate_url(
         async def _run():
             async with async_playwright() as p:
                 browser_or_none, context, page, is_remote = await get_browser_and_page(p, is_search=False)
+                await setup_memory_saving_routes(page)
                 try:
                     await _apply_stealth(page)
 
@@ -1074,6 +1149,7 @@ async def navigate_url(
             f"[navigate_url] Done — {len(result)} chars returned",
             file=sys.stderr, flush=True,
         )
+        gc.collect()
         return result
     except asyncio.TimeoutError:
         print(f"[navigate_url] [TIMEOUT] navigate_url exceeded {timeout}s", file=sys.stderr, flush=True)
