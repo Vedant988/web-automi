@@ -124,6 +124,8 @@ def build_client(api_key: str | None = None) -> "Groq | None":
 from browser_tools import search_web, navigate_url, select_chrome_profile
 import browser_tools
 
+AGENT_SHOULD_STOP = False
+
 DEFAULT_FINAL_MODEL = "llama-3.3-70b-versatile"
 DEFAULT_REASONING_EFFORT = "low"
 MODELS_WITHOUT_REASONING_EFFORT = {
@@ -468,44 +470,48 @@ def stream_chat_with_tools(
         if desired_completion <= 0:
             raise RuntimeError("Prompt too large to fit token limit")
 
-        # Let the Groq API SDK handle exact token limitations via HTTP 429 errors
+        # Let the Groq API SDK handle exact token lim        # Keep local mutable copies of the model parameters to ensure updates carry over perfectly on retries
+        current_reasoning_effort = call_reasoning_effort
+        current_tool_choice = call_tool_choice
 
         tool_count = len(request_tools) if request_tools else 0
-        print(
-            f"[{label}] [START] Sending request with {len(call_messages)} message(s), tools={tool_count}",
-            file=sys.stderr,
-            flush=True,
-        )
-        print(
-            f"[{label}] Model={call_model}, temp={call_temperature}, reasoning={call_reasoning_effort or 'default'}, completion_tokens={desired_completion}",
-            file=sys.stderr,
-            flush=True,
-        )
-
-        request_kwargs = {
-            "model": call_model,
-            "messages": call_messages,
-            "temperature": call_temperature,
-            "max_completion_tokens": desired_completion,
-            "top_p": top_p,
-        }
-        if request_tools is not None:
-            request_kwargs["tools"] = request_tools
-            if call_tool_choice is not None:
-                request_kwargs["tool_choice"] = call_tool_choice
-        supports_reasoning_effort = (
-            call_reasoning_effort is not None
-            and call_model not in MODELS_WITHOUT_REASONING_EFFORT
-        )
-        if supports_reasoning_effort:
-            request_kwargs["reasoning_effort"] = call_reasoning_effort
-
-        print(f"[{label}] [WAIT] Calling client.chat.completions.create()...", file=sys.stderr, flush=True)
         import re
-        # Each retry may use a different API key from the pool
         max_api_retries = max(3, len(_API_KEY_POOL) + 1)
         keys_tried: set[int] = set()
+
         for api_attempt in range(max_api_retries):
+            # Dynamically rebuild request_kwargs on each attempt
+            request_kwargs = {
+                "model": call_model,
+                "messages": call_messages,
+                "temperature": call_temperature,
+                "max_completion_tokens": desired_completion,
+                "top_p": top_p,
+            }
+            if request_tools is not None:
+                request_kwargs["tools"] = request_tools
+                if current_tool_choice is not None:
+                    request_kwargs["tool_choice"] = current_tool_choice
+            
+            supports_reasoning_effort = (
+                current_reasoning_effort is not None
+                and call_model not in MODELS_WITHOUT_REASONING_EFFORT
+            )
+            if supports_reasoning_effort:
+                request_kwargs["reasoning_effort"] = current_reasoning_effort
+
+            print(
+                f"[{label}] [START] Sending request with {len(call_messages)} message(s), tools={tool_count} (attempt {api_attempt + 1}/{max_api_retries})",
+                file=sys.stderr,
+                flush=True,
+            )
+            print(
+                f"[{label}] Model={call_model}, temp={call_temperature}, reasoning={current_reasoning_effort or 'default'}, completion_tokens={desired_completion}",
+                file=sys.stderr,
+                flush=True,
+            )
+            print(f"[{label}] [WAIT] Calling client.chat.completions.create()...", file=sys.stderr, flush=True)
+
             try:
                 raw = client.chat.completions.with_raw_response.create(**request_kwargs)
                 response = raw.parse()
@@ -514,7 +520,7 @@ def stream_chat_with_tools(
                 error_text = str(exc)
                 if supports_reasoning_effort and "`reasoning_effort` is not supported with this model" in error_text:
                     MODELS_WITHOUT_REASONING_EFFORT.add(call_model)
-                    request_kwargs.pop("reasoning_effort", None)
+                    current_reasoning_effort = None
                     print(
                         f"[{label}] [WARN] {call_model} does not support reasoning_effort; retrying without it",
                         file=sys.stderr,
@@ -550,9 +556,9 @@ def stream_chat_with_tools(
                         "Retrying with tools but without reasoning_effort...",
                         file=sys.stderr, flush=True,
                     )
-                    request_kwargs.pop("reasoning_effort", None)
-                    if request_kwargs.get("tool_choice") == "required":
-                        request_kwargs["tool_choice"] = "auto"
+                    current_reasoning_effort = None
+                    if current_tool_choice == "required":
+                        current_tool_choice = "auto"
                     # Mark this model so we never set reasoning_effort for it again
                     MODELS_WITHOUT_REASONING_EFFORT.add(call_model)
                     continue
@@ -562,8 +568,8 @@ def stream_chat_with_tools(
                         "Retrying with tool_choice=auto...",
                         file=sys.stderr, flush=True,
                     )
-                    request_kwargs["tool_choice"] = "auto"
-                    request_kwargs.pop("reasoning_effort", None)
+                    current_tool_choice = "auto"
+                    current_reasoning_effort = None
                     MODELS_WITHOUT_REASONING_EFFORT.add(call_model)
                     continue
                 else:
@@ -711,6 +717,9 @@ def stream_chat_with_tools(
             )
 
             while True:
+                if AGENT_SHOULD_STOP:
+                    print("[react-loop] [STOP] Cancellation requested by user; aborting stream", file=sys.stderr, flush=True)
+                    raise KeyboardInterrupt("Task stopped by user")
                 react_round += 1
                 handled_tool_calls = False
 
@@ -757,6 +766,9 @@ def stream_chat_with_tools(
 
                     # Execute each tool call and append results to history
                     for tool_call in tool_calls:
+                        if AGENT_SHOULD_STOP:
+                            print("[react-loop] [STOP] Cancellation requested by user; aborting tool call", file=sys.stderr, flush=True)
+                            raise KeyboardInterrupt("Task stopped by user")
                         if tool_call_count >= max_tool_calls:
                             print(
                                 f"[react-loop] [WARN] Reached max_tool_calls="

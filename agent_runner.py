@@ -205,13 +205,23 @@ class AgentRunner:
         self._thread.start()
 
     def stop(self):
+        import groq_chat
+        groq_chat.AGENT_SHOULD_STOP = True
+
         self.status = "failed"
         now = datetime.now(timezone.utc).isoformat()
         self.event_queue.put(AgentStep(
             len(self.steps) + 1, "error", "failed", "Agent stopped", "Stopped by user", now
         ))
+        
+        # Force kill any active browser to instantly interrupt hanging Playwright operations
+        from browser_tools import force_kill_browser
+        force_kill_browser()
 
     def _run(self, prompt, model, final_model):
+        import groq_chat
+        groq_chat.AGENT_SHOULD_STOP = False
+
         from groq_chat import stream_chat_with_tools
 
         original_stderr, original_stdout = sys.stderr, sys.stdout
