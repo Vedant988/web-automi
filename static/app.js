@@ -36,6 +36,9 @@ const resultCard    = document.getElementById("result-card");
 const resultBody    = document.getElementById("result-body");
 const historyList   = document.getElementById("history-list");
 const settingModel  = document.getElementById("setting-model");
+const settingModelMobile = document.getElementById("setting-model-mobile");
+const settingThinking = document.getElementById("setting-thinking");
+const settingThinkingMobile = document.getElementById("setting-thinking-mobile");
 
 const userName      = document.getElementById("user-name");
 const userAvatar    = document.getElementById("user-avatar");
@@ -124,8 +127,8 @@ function resetAgent() {
   stepCount = 0;
   stepList.innerHTML = "";
   logBody.innerHTML = "";
-  resultBody.innerHTML = "";
-  resultCard.classList.add("hidden");
+  resultBody.innerHTML = '<p class="text-white/65">Waiting for the final answer...</p>';
+  resultCard.classList.remove("hidden");
   stepCountBadge.textContent = "0 Steps";
   stepBadge.classList.add("hidden");
   stepNum.textContent = "0";
@@ -301,6 +304,11 @@ function runTask(prompt) {
   document.querySelectorAll(".btn-run-ui").forEach(b => b.classList.add("hidden"));
   document.querySelectorAll(".btn-stop-ui").forEach(b => b.classList.remove("hidden"));
   taskInput.disabled = true;
+  if (taskInputMobile) taskInputMobile.disabled = true;
+  if (settingModel) settingModel.disabled = true;
+  if (settingModelMobile) settingModelMobile.disabled = true;
+  if (settingThinking) settingThinking.disabled = true;
+  if (settingThinkingMobile) settingThinkingMobile.disabled = true;
 
   // Live elapsed timer — update status chip every second
   if (elapsedTimer) clearInterval(elapsedTimer);
@@ -309,12 +317,13 @@ function runTask(prompt) {
     document.querySelectorAll(".status-label-ui").forEach(el => el.textContent = `Running ${s}s`);
   }, 1000);
 
-  const model = settingModel.value;
+  const model = getSelectedModel();
+  const thinking = getSelectedThinking();
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   ws = new WebSocket(`${protocol}//${location.host}/ws/run`);
 
   ws.onopen = () => {
-    ws.send(JSON.stringify({ prompt: prompt.trim(), model }));
+    ws.send(JSON.stringify({ prompt: prompt.trim(), model, thinking }));
   };
 
   ws.onmessage = (event) => {
@@ -322,7 +331,7 @@ function runTask(prompt) {
 
     switch (msg.type) {
       case "started":
-        addLog({ title: "Task started", detail: prompt.trim(), status: "success", type: "init" });
+        addLog({ title: "Task started", detail: `${prompt.trim()} (${formatThinkingLabel(thinking)} thinking)`, status: "success", type: "init" });
         break;
 
       case "step":
@@ -408,6 +417,11 @@ function finishRun() {
   document.querySelectorAll(".btn-run-ui").forEach(b => b.classList.remove("hidden"));
   document.querySelectorAll(".btn-stop-ui").forEach(b => b.classList.add("hidden"));
   taskInput.disabled = false;
+  if (taskInputMobile) taskInputMobile.disabled = false;
+  if (settingModel) settingModel.disabled = false;
+  if (settingModelMobile) settingModelMobile.disabled = false;
+  if (settingThinking) settingThinking.disabled = false;
+  if (settingThinkingMobile) settingThinkingMobile.disabled = false;
   taskInput.focus();
   ws = null;
 }
@@ -430,15 +444,15 @@ async function loadHistory() {
       return;
     }
     historyList.innerHTML = tasks.map(t => `
-      <div class="bg-white rounded-xl border border-slate-100 p-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:border-slate-300 transition cursor-pointer flex items-start justify-between gap-4" onclick="viewTask('${t.id}')">
+      <div class="bg-white rounded-xl border border-slate-100 p-3 md:p-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:border-slate-300 transition cursor-pointer grid grid-cols-[minmax(0,1fr)_auto] gap-3 md:gap-4 items-start overflow-hidden" onclick="viewTask('${t.id}')">
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-slate-800 truncate">${esc(t.prompt)}</p>
-          <div class="flex items-center gap-3 mt-2">
+          <p class="text-sm font-medium text-slate-800 truncate max-w-full">${esc(t.prompt)}</p>
+          <div class="flex flex-wrap items-center gap-2 md:gap-3 mt-2 min-w-0">
             <span class="text-[11px] font-semibold uppercase px-2 py-0.5 rounded ${t.status === 'completed' ? 'bg-green-50 text-green-700 border border-green-200' : t.status === 'failed' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}">${t.status}</span>
             <span class="text-[11px] text-slate-400">${timeAgo(t.created_at)}</span>
           </div>
         </div>
-        <button class="text-slate-300 hover:text-red-500 transition p-1" onclick="event.stopPropagation(); deleteTask('${t.id}')">
+        <button class="shrink-0 w-8 h-8 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition flex items-center justify-center" onclick="event.stopPropagation(); deleteTask('${t.id}')" title="Delete task">
           <span class="material-symbols-outlined text-[18px]">delete</span>
         </button>
       </div>
@@ -464,6 +478,9 @@ async function viewTask(id) {
       resultCard.classList.remove("hidden");
       resultBody.innerHTML = renderMarkdown(task.result);
       setStatus(task.status === "completed" ? "success" : "failed", task.status === "completed" ? "Completed" : "Failed");
+    } else {
+      resultCard.classList.remove("hidden");
+      resultBody.innerHTML = '<p class="text-white/65">No final answer was saved for this task.</p>';
     }
     taskInput.value = task.prompt;
     if (typeof autoResize === 'function') autoResize(taskInput);
@@ -509,6 +526,23 @@ function timeAgo(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
+function getSelectedModel() {
+  return (window.innerWidth < 768 && settingModelMobile ? settingModelMobile.value : settingModel.value);
+}
+
+function getSelectedThinking() {
+  return (window.innerWidth < 768 && settingThinkingMobile ? settingThinkingMobile.value : settingThinking.value);
+}
+
+function formatThinkingLabel(value) {
+  return {
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    very_high: "Very high",
+  }[value] || "Low";
+}
+
 // ══════════════════════════════════════════════════════
 // EVENT LISTENERS
 // ══════════════════════════════════════════════════════
@@ -549,6 +583,16 @@ if (taskInputMobile) {
     taskInputMobile.value = taskInput.value; 
     autoResize(taskInputMobile);
   });
+}
+
+if (settingModel && settingModelMobile) {
+  settingModel.addEventListener("change", () => { settingModelMobile.value = settingModel.value; });
+  settingModelMobile.addEventListener("change", () => { settingModel.value = settingModelMobile.value; });
+}
+
+if (settingThinking && settingThinkingMobile) {
+  settingThinking.addEventListener("change", () => { settingThinkingMobile.value = settingThinking.value; });
+  settingThinkingMobile.addEventListener("change", () => { settingThinking.value = settingThinkingMobile.value; });
 }
 
 document.querySelectorAll(".example-chip").forEach(c => c.addEventListener("click", () => { 

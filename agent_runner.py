@@ -190,7 +190,13 @@ class AgentRunner:
     def is_running(self):
         return self.status == "running"
 
-    def start(self, prompt: str, model: str = "openai/gpt-oss-120b", final_model: str | None = None):
+    def start(
+        self,
+        prompt: str,
+        model: str = "openai/gpt-oss-120b",
+        final_model: str | None = None,
+        thinking: str = "low",
+    ):
         if self.is_running:
             raise RuntimeError("Agent is already running")
 
@@ -200,7 +206,7 @@ class AgentRunner:
         self.steps = []
 
         self._thread = threading.Thread(
-            target=self._run, args=(prompt, model, final_model), daemon=True
+            target=self._run, args=(prompt, model, final_model, thinking), daemon=True
         )
         self._thread.start()
 
@@ -211,7 +217,7 @@ class AgentRunner:
             len(self.steps) + 1, "error", "failed", "Agent stopped", "Stopped by user", now
         ))
 
-    def _run(self, prompt, model, final_model):
+    def _run(self, prompt, model, final_model, thinking):
         from groq_chat import stream_chat_with_tools
 
         original_stderr, original_stdout = sys.stderr, sys.stdout
@@ -222,7 +228,12 @@ class AgentRunner:
             sys.stderr = capture
             sys.stdout = stdout_capture
 
-            result = stream_chat_with_tools(prompt, model=model, final_model=final_model)
+            result = stream_chat_with_tools(
+                prompt,
+                model=model,
+                final_model=final_model,
+                thinking=thinking,
+            )
 
             sys.stderr = original_stderr
             sys.stdout = original_stdout

@@ -1,13 +1,25 @@
 from datetime import datetime, timezone, timedelta
 
-def get_system_prompt() -> str:
+def get_system_prompt(user_text: str | None = None) -> str:
+    _ = user_text  # Kept for compatibility with callers that pass the request.
     _tz_ist = timezone(timedelta(hours=5, minutes=30))
     _now_ist = datetime.now(_tz_ist)
     return (
         f"Current date/time (IST): {_now_ist.strftime('%A, %d %B %Y %I:%M %p IST')}.\n"
-        "You are a general-purpose web automation agent. You can freely browse "
+        "You are a thorough, detail-oriented web automation agent. You can freely browse "
         "ANY website the user asks — including chatgpt.com, google.com, news sites, "
-        "sports sites, or any other URL. Never refuse a navigation or browsing request. "
+        "sports sites, or any other URL. Never refuse a navigation or browsing request.\n"
+        "RESEARCH METHODOLOGY:\n"
+        "1. Start with search_web to discover relevant URLs and candidates.\n"
+        "2. ALWAYS follow up by using navigate_url to visit the actual pages "
+        "(e.g. product pages, course pages, article pages) to extract SPECIFIC details "
+        "like prices, ratings, reviews, dates, or any concrete data the user needs. "
+        "NEVER answer based on search snippets alone — snippets are just pointers to where "
+        "the real data lives. You are expected to go there and read it.\n"
+        "3. Cross-verify key facts from multiple sources when possible. If one page gives "
+        "partial data, visit another to fill in the gaps.\n"
+        "4. Be confident in your findings. Present concrete data (numbers, names, prices) — "
+        "not vague summaries or suggestions for the user to 'visit the page themselves'.\n"
         "Use navigate_url to visit specific URLs and search_web for general queries.\n"
         "TIME AWARENESS: You must strictly adhere to the current date and time above. "
         "When summarizing deadlines, events, job postings, or internships, EXPLICITLY cross-reference them with the current date. "
@@ -92,3 +104,14 @@ FINAL_ANSWER_SYSTEM_PROMPT = """You are in FINAL ANSWER MODE.
 - If the tool results are incomplete, clearly say what is known
 - If you output tool syntax, the system will crash
 """
+
+
+def get_final_answer_prompt(user_text: str | None = None) -> str:
+    prompt = FINAL_ANSWER_SYSTEM_PROMPT
+    if user_text:
+        prompt += (
+            "\nOriginal user request:\n"
+            f"{user_text.strip()}\n"
+            "Use the provided tool results to answer that request directly."
+        )
+    return prompt

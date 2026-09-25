@@ -113,6 +113,7 @@ def api_me(user: dict = Depends(get_current_user)):
 class RunTaskRequest(BaseModel):
     prompt: str
     model: str = "openai/gpt-oss-20b"
+    thinking: str = "low"
 
 @app.get("/api/tasks")
 def api_list_tasks(user: dict = Depends(get_current_user)):
@@ -155,6 +156,9 @@ async def ws_run(websocket: WebSocket):
         data = await websocket.receive_json()
         prompt = (data.get("prompt") or "").strip()
         model = data.get("model", "openai/gpt-oss-20b")
+        thinking = data.get("thinking", "low")
+        if thinking not in {"low", "medium", "high", "very_high"}:
+            thinking = "low"
 
         if not prompt:
             await websocket.send_json({"type": "error", "data": {"error": "Empty prompt"}})
@@ -165,7 +169,7 @@ async def ws_run(websocket: WebSocket):
 
         task = create_task(prompt, user_id=user["id"], model=model)
         task_id = task["id"]
-        runner.start(prompt, model=model)
+        runner.start(prompt, model=model, thinking=thinking)
         await websocket.send_json({"type": "started", "data": {"task_id": task_id}})
 
         while True:

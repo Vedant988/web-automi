@@ -131,14 +131,16 @@
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 /* Suppress the Tailwind forms-plugin border/ring on the inner input */
-.search-pill input {
+.search-pill input,
+.search-pill textarea {
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
   background: transparent !important;
   padding: 0 !important;
 }
-.search-pill input::placeholder {
+.search-pill input::placeholder,
+.search-pill textarea::placeholder {
   color: #94a3b8;
 }
 

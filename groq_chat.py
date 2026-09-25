@@ -85,16 +85,19 @@ def build_client(api_key: str | None = None) -> "Groq | None":
 from browser_tools import search_web, navigate_url, select_chrome_profile
 import browser_tools
 
-DEFAULT_FINAL_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_FINAL_MODEL = "qwen/qwen3.8-27b"
 DEFAULT_REASONING_EFFORT = "low"
+THINKING_PROFILES = {
+    "low": {"reasoning_effort": "low", "max_tool_calls": 3},
+    "medium": {"reasoning_effort": "medium", "max_tool_calls": 5},
+    "high": {"reasoning_effort": "high", "max_tool_calls": 8},
+    # Groq reasoning_effort currently tops out at high for supported models.
+    # "Very high" spends more time in the ReAct loop while keeping API input valid.
+    "very_high": {"reasoning_effort": "high", "max_tool_calls": 12},
+}
 MODELS_WITHOUT_REASONING_EFFORT = {
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "gemma2-9b-it",
-    "moonshotai/kimi-k2-instruct",
-    # Llama models produce broken XML tool-call format when reasoning_effort is set
-    "meta-llama/llama-4-scout-17b-16e-instruct",
-    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "qwen/qwen3.8-27b",
+    "allam-2-7b",
 }
 
 
@@ -153,7 +156,7 @@ def looks_like_tool_output(text: str) -> bool:
 
 # Fast, cheap model used only for compressing tool results in the ReAct loop.
 # Needs to be in MODELS_WITHOUT_REASONING_EFFORT since we don't set that param.
-_SUMMARIZER_MODEL = "llama-3.1-8b-instant"
+_SUMMARIZER_MODEL = "qwen/qwen3.8-27b"
 _SUMMARIZER_TRUNCATE_FALLBACK = 3500  # raised from 2000 — preserves apply links & stipends
 
 
@@ -293,12 +296,22 @@ def stream_chat_with_tools(
     final_reasoning_effort: str = DEFAULT_REASONING_EFFORT,
     max_tool_calls: int = 3,
     max_final_answer_retries: int = 2,
+    thinking: str | None = None,
 ):
     """
     Stream chat with a two-phase tool flow.
     Phase 1 uses a tool-enabled model.
     Phase 2 uses a tool-free final-answer model with defensive retries.
     """
+    if thinking:
+        profile = THINKING_PROFILES.get(thinking, THINKING_PROFILES["low"])
+        reasoning_effort = profile["reasoning_effort"]
+        # Final-answer phase just synthesizes plain text from tool results —
+        # heavy reasoning burns all completion tokens on thinking, leaving
+        # 0 chars for visible output.  Always keep this at "low".
+        final_reasoning_effort = "low"
+        max_tool_calls = profile["max_tool_calls"]
+
     TPM_LIMIT = 8000
     RPM_LIMIT = 30
 
@@ -474,23 +487,35 @@ def stream_chat_with_tools(
                         time.sleep(wait_s)
                     else:
                         raise RuntimeError(f"Rate limit: all {len(_API_KEY_POOL)} key(s) exhausted. (API error: {error_text})")
-                elif "tool_use_failed" in error_text or "failed_generation" in error_text:
-                    # Llama models sometimes emit tool calls in a broken XML format
-                    # (<function=name {...}> instead of JSON). This is triggered by
-                    # reasoning_effort being set. Retry WITH tools but WITHOUT
-                    # reasoning_effort so the model produces valid JSON tool calls.
+                elif "tool_use_failed" in error_text or "failed_generation" in error_text or "output_parse_failed" in error_text:
+                    # Model produced unparseable output. Retry WITHOUT reasoning_effort
+                    # and, if that also fails, WITHOUT tools entirely.
                     print(
-                        f"[{label}] [WARN] Model produced broken tool-call format (XML-style). "
-                        "Retrying with tools but without reasoning_effort...",
+                        f"[{label}] [WARN] Model produced broken output (parse failed). "
+                        "Retrying without reasoning_effort...",
                         file=sys.stderr, flush=True,
                     )
                     recovery_kwargs = {k: v for k, v in request_kwargs.items()}
                     recovery_kwargs.pop("reasoning_effort", None)
-                    # Mark this model so we never set reasoning_effort for it again
                     MODELS_WITHOUT_REASONING_EFFORT.add(call_model)
-                    raw = client.chat.completions.with_raw_response.create(**recovery_kwargs)
-                    response = raw.parse()
-                    break
+                    try:
+                        raw = client.chat.completions.with_raw_response.create(**recovery_kwargs)
+                        response = raw.parse()
+                        break
+                    except Exception as recovery_exc:
+                        recovery_text = str(recovery_exc)
+                        if "failed_generation" in recovery_text or "output_parse_failed" in recovery_text:
+                            print(
+                                f"[{label}] [WARN] Recovery also failed; retrying without tools...",
+                                file=sys.stderr, flush=True,
+                            )
+                            recovery_kwargs.pop("tools", None)
+                            recovery_kwargs.pop("tool_choice", None)
+                            raw = client.chat.completions.with_raw_response.create(**recovery_kwargs)
+                            response = raw.parse()
+                            break
+                        else:
+                            raise
                 else:
                     raise
 
@@ -590,7 +615,8 @@ def stream_chat_with_tools(
     resolved_final_model = pick_final_model(model, final_model)
 
     print(
-        f"[init] Tool model: {model}, Final model: {resolved_final_model}, Retries: {retries}",
+        f"[init] Tool model: {model}, Final model: {resolved_final_model}, "
+        f"Thinking: {thinking or reasoning_effort}, Max tool calls: {max_tool_calls}, Retries: {retries}",
         file=sys.stderr,
         flush=True,
     )
@@ -831,15 +857,21 @@ def stream_chat_with_tools(
                             "role": "user",
                             "content": "You have NOT performed any web searches yet. You MUST call search_web now before answering. Do not describe what you would search — call the tool immediately."
                         })
-                        response = create_completion(
-                            model,
-                            messages,
-                            temperature,
-                            request_tools=TOOLS,
-                            call_tool_choice="required",
-                            call_reasoning_effort=reasoning_effort,
-                            label=f"react-{react_round}-forced",
-                        )
+                        try:
+                            response = create_completion(
+                                model,
+                                messages,
+                                temperature,
+                                request_tools=TOOLS,
+                                call_tool_choice="required",
+                                call_reasoning_effort=reasoning_effort,
+                                label=f"react-{react_round}-forced",
+                            )
+                        except RuntimeError as e:
+                            if "too large" in str(e).lower():
+                                print(f"[react-loop] [WARN] Prompt too large for forced search; exiting loop", file=sys.stderr, flush=True)
+                                break
+                            raise
                         continue
                     else:
                         # Model returned plain text after at least one search — accept it.
@@ -867,15 +899,25 @@ def stream_chat_with_tools(
                     f"(estimated prompt tokens: {_est_prompt}/{TPM_LIMIT})",
                     file=sys.stderr, flush=True,
                 )
-                response = create_completion(
-                    model,
-                    messages,
-                    temperature,
-                    request_tools=TOOLS,
-                    call_tool_choice="auto",
-                    call_reasoning_effort=reasoning_effort,
-                    label=f"react-{react_round}",
-                )
+                try:
+                    response = create_completion(
+                        model,
+                        messages,
+                        temperature,
+                        request_tools=TOOLS,
+                        call_tool_choice="auto",
+                        call_reasoning_effort=reasoning_effort,
+                        label=f"react-{react_round}",
+                    )
+                except RuntimeError as e:
+                    if "too large" in str(e).lower():
+                        print(
+                            f"[react-loop] [WARN] Prompt too large after {tool_call_count} tool call(s); "
+                            "synthesising final answer from collected results",
+                            file=sys.stderr, flush=True,
+                        )
+                        break
+                    raise
             # ── End ReAct loop ───────────────────────────────────────────────
 
             # If any tools were executed, ALWAYS synthesize the final answer

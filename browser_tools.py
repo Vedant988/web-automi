@@ -152,7 +152,38 @@ SEARCH_USER_AGENT = (
 SELECTED_CHROME_PROFILE = None
 
 # Vision model used by the Set-of-Mark visual navigation agent.
-VLM_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+VLM_MODEL = "qwen/qwen3.8-27b"
+
+# ── DuckDuckGo / search engine SERP noise patterns ──────────────────────────
+# The raw body.innerText of a DDG SERP includes dropdown contents (region
+# filter, time filter) which expand into dozens of country names, wasting
+# hundreds of tokens.  We strip them before feeding the text to the LLM.
+import re as _re
+
+_DDG_REGION_BLOCK = _re.compile(
+    r"(?:All Regions\n)"                # sentinel start
+    r"(?:[\w\s()/-]+\n){5,}?"           # country names, one per line
+    r"(?=Any Time|Past |Safe Search|Moderate)",  # first non-country line
+    _re.MULTILINE,
+)
+
+_DDG_TIME_BLOCK = _re.compile(
+    r"Any Time\n(?:Past (?:Day|Week|Month|Year)\n?)+",
+    _re.MULTILINE,
+)
+
+_SAFE_SEARCH_BLOCK = _re.compile(
+    r"(?:Safe Search|Moderate|Strict|Off)\n?",
+    _re.MULTILINE,
+)
+
+
+def clean_serp_body(text: str) -> str:
+    """Remove DuckDuckGo dropdown / filter noise from raw SERP innerText."""
+    text = _DDG_REGION_BLOCK.sub("", text)
+    text = _DDG_TIME_BLOCK.sub("", text)
+    text = _SAFE_SEARCH_BLOCK.sub("", text)
+    return text.strip()
 
 
 def normalize_whitespace(text: str, limit: int | None = None) -> str:
@@ -813,6 +844,7 @@ async def search_web(query: str, timeout: int = 90) -> str:
                             body_text = ""
 
                         normalized_body = normalize_whitespace(body_text, limit=5000)
+                        normalized_body = clean_serp_body(normalized_body)
                         if looks_like_blocked_page(title, normalized_body):
                             notes.append(f"{engine['name']}: blocked or anti-bot page detected")
                             print(
