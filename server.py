@@ -112,7 +112,7 @@ def api_me(user: dict = Depends(get_current_user)):
 # ── REST endpoints ──────────────────────────────────────────────
 class RunTaskRequest(BaseModel):
     prompt: str
-    model: str = "openai/gpt-oss-20b"
+    model: str = "qwen/qwen3.8-27b"
     thinking: str = "low"
 
 @app.get("/api/tasks")
@@ -155,7 +155,7 @@ async def ws_run(websocket: WebSocket):
 
         data = await websocket.receive_json()
         prompt = (data.get("prompt") or "").strip()
-        model = data.get("model", "openai/gpt-oss-20b")
+        model = data.get("model", "qwen/qwen3.8-27b")
         thinking = data.get("thinking", "low")
         if thinking not in {"low", "medium", "high", "very_high"}:
             thinking = "low"

@@ -113,11 +113,9 @@ tailwind.config = {
       <!-- Right: model selector + status + mobile run -->
       <div class="flex items-center gap-2 shrink-0 ml-auto">
         <select id="setting-model" class="hidden md:block w-[172px] text-xs bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-600 focus:ring-1 focus:ring-primary h-8">
-          <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+          <option value="qwen/qwen3.8-27b" selected>Qwen 3.8 27B (Default)</option>
           <option value="openai/gpt-oss-120b">GPT OSS 120B</option>
-          <option value="openai/gpt-oss-20b" selected>GPT OSS 20B (Default)</option>
-          <option value="qwen/qwen3-32b">Qwen 3 32B</option>
-          <option value="llama-3.1-8b-instant">Llama 3.1 8B (Fast)</option>
+          <option value="openai/gpt-oss-20b">GPT OSS 20B</option>
         </select>
         <select id="setting-thinking" class="hidden md:block w-[112px] text-xs bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 text-slate-600 focus:ring-1 focus:ring-primary h-8" title="Thinking ability">
           <option value="low" selected>Low</option>
@@ -149,11 +147,9 @@ tailwind.config = {
       </div>
       <div class="mt-2 grid grid-cols-2 gap-2">
         <select id="setting-model-mobile" class="text-xs bg-white border border-slate-200 rounded-md py-2 px-2 text-slate-600 focus:ring-1 focus:ring-primary h-9">
-          <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+          <option value="qwen/qwen3.8-27b" selected>Qwen 3.8 27B</option>
           <option value="openai/gpt-oss-120b">GPT OSS 120B</option>
-          <option value="openai/gpt-oss-20b" selected>GPT OSS 20B</option>
-          <option value="qwen/qwen3-32b">Qwen 3 32B</option>
-          <option value="llama-3.1-8b-instant">Llama 3.1 8B</option>
+          <option value="openai/gpt-oss-20b">GPT OSS 20B</option>
         </select>
         <select id="setting-thinking-mobile" class="text-xs bg-white border border-slate-200 rounded-md py-2 px-2 text-slate-600 focus:ring-1 focus:ring-primary h-9">
           <option value="low" selected>Low thinking</option>

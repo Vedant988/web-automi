@@ -98,6 +98,12 @@ THINKING_PROFILES = {
 MODELS_WITHOUT_REASONING_EFFORT = {
     "qwen/qwen3.8-27b",
     "allam-2-7b",
+    # gpt-oss models frequently produce broken tool-call output when
+    # reasoning_effort is set, triggering output_parse_failed / failed_generation
+    # errors from the Groq API.  Disabling reasoning_effort greatly reduces
+    # the parse-failure rate.
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
 }
 
 
@@ -179,13 +185,14 @@ def summarize_tool_result(result: str, user_query: str, groq_client) -> str:
         "into a tight, factual summary.\n"
         "Rules:\n"
         "- Keep ONLY facts directly relevant to the user query.\n"
-        "- CRITICAL: ALWAYS preserve all URLs, apply links, and direct application links VERBATIM.\n"
-        "- CRITICAL: ALWAYS preserve stipend/salary amounts, company names, role titles, and posting dates.\n"
-        "- CRITICAL: ALWAYS preserve location information and eligibility/batch year details.\n"
+        "- CRITICAL: ALWAYS preserve all URLs and links VERBATIM — the agent needs these "
+        "to navigate to pages and extract detailed data.\n"
+        "- CRITICAL: ALWAYS preserve names, titles, ratings, prices, dates, and key numbers.\n"
+        "- CRITICAL: ALWAYS preserve location information and eligibility details.\n"
         "- Drop navigation text, ads, repeated boilerplate, cookie banners, and off-topic content.\n"
         "- Output plain text, 200-350 words maximum.\n"
         "- Do NOT add any commentary, preamble, or closing remarks.\n"
-        "- Do NOT summarize away or omit any apply link, stipend, or company detail."
+        "- Do NOT summarize away any URL, link, or concrete data point."
     )
     user_prompt = (
         f"User query: {user_query}\n\n"
@@ -285,7 +292,7 @@ def build_tool_result_fallback(executed_tools: list[dict]) -> str:
 
 def stream_chat_with_tools(
     user_text: str,
-    model: str = "openai/gpt-oss-20b",
+    model: str = "qwen/qwen3.8-27b",
     temperature: float = 0.0,
     max_completion_tokens: int = 2048,
     top_p: float = 0.9,
@@ -634,6 +641,8 @@ def stream_chat_with_tools(
             tool_call_count = 0
             executed_tools = []
             react_round = 0
+            forced_retries = 0
+            MAX_FORCED_RETRIES = 3  # give up forcing tool calls after this many failures
 
             # ---------------------------------------------------------------
             # ReAct loop: Reason → Act → Observe → Reason → ...
@@ -848,9 +857,18 @@ def stream_chat_with_tools(
                     # Only accept this if at least one tool call was already made;
                     # otherwise the response is just training-data hallucination.
                     if tool_call_count == 0:
+                        forced_retries += 1
+                        if forced_retries > MAX_FORCED_RETRIES:
+                            print(
+                                f"[react-loop] [WARN] Forced search failed {MAX_FORCED_RETRIES} "
+                                "times (model cannot produce valid tool calls). "
+                                "Accepting text-only response.",
+                                file=sys.stderr, flush=True,
+                            )
+                            break
                         print(
                             f"[react-loop] Model tried to answer without any tool calls. "
-                            "Forcing a search call now.",
+                            f"Forcing a search call now (attempt {forced_retries}/{MAX_FORCED_RETRIES}).",
                             file=sys.stderr, flush=True,
                         )
                         messages.append({
